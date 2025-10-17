@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Localify</string>
+    <!-- Mapbox public access token. Replace with your actual token from https://account.mapbox.com/ -->
+    <string name="mapbox_access_token">YOUR_MAPBOX_ACCESS_TOKEN</string>
 </resources>

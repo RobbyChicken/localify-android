@@ -23,6 +23,10 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDemoKeyForDevelopment" />
+        <!-- Mapbox access token configured via string resource -->
+        <meta-data
+            android:name="com.mapbox.maps.token"
+            android:value="@string/mapbox_access_token" />
             
         <activity
             android:name=".MainActivity"
