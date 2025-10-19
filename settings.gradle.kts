@@ -10,8 +10,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Mapbox repository removed to avoid requiring tokens. Using Google Maps Compose.
     }
 }
 
 rootProject.name = "Localify"
 include(":app")
+

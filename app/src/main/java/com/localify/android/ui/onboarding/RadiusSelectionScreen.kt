@@ -1,6 +1,7 @@
 package com.localify.android.ui.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -9,20 +10,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.mapbox.maps.CameraOptions
-import com.mapbox.maps.MapView
-import com.mapbox.maps.Style
-import com.mapbox.maps.plugin.gestures.gestures
-import com.mapbox.maps.plugin.lifecycle.onStart
-import com.mapbox.maps.plugin.lifecycle.onStop
+import androidx.compose.runtime.LaunchedEffect
+// Google Maps (primary provider when key present)
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
 
 @Composable
 fun RadiusSelectionScreen(
@@ -32,9 +31,19 @@ fun RadiusSelectionScreen(
 ) {
     var radiusValue by remember { mutableStateOf(radius.toFloat()) }
     val context = LocalContext.current
-    // Ithaca, NY as default center (replace with geocoded city center when available)
-    val centerLat = 42.443961
-    val centerLng = -76.501881
+    val lat = 42.443961
+    val lng = -76.501881
+    val mapCenterGms = remember { LatLng(lat, lng) }
+    // Detect if Google Maps API key is present
+    val hasGoogleMapsKey by remember {
+        mutableStateOf(
+            try {
+                val ai = context.packageManager.getApplicationInfo(context.packageName, android.content.pm.PackageManager.GET_META_DATA)
+                val key = ai.metaData?.getString("com.google.android.geo.API_KEY")
+                !key.isNullOrBlank()
+            } catch (_: Throwable) { false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -62,7 +71,7 @@ fun RadiusSelectionScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Mapbox map with overlayed radius UI
+        // Real Google Maps with nearby locations and city display
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -71,64 +80,143 @@ fun RadiusSelectionScreen(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFFF5F5F5))
         ) {
-            // MapView
-            var mapView: MapView? by remember { mutableStateOf(null) }
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = {
-                    MapView(context).also { mv ->
-                        mapView = mv
-                        mv.getMapboxMap().loadStyleUri(Style.MAPBOX_STREETS) {
-                            mv.getMapboxMap().setCamera(
-                                CameraOptions.Builder()
-                                    .center(com.mapbox.geojson.Point.fromLngLat(centerLng, centerLat))
-                                    .zoom(11.0)
-                                    .build()
-                            )
-                        }
-                        // Optional: lock gestures so the center remains fixed
-                        mv.gestures.apply {
-                            rotateEnabled = false
-                            pitchEnabled = false
-                            scrollEnabled = false
-                            zoomEnabled = true
-                        }
+            var mapLoaded by remember { mutableStateOf(false) }
+            
+            if (hasGoogleMapsKey) {
+                val cameraPositionState = rememberCameraPositionState {
+                    position = CameraPosition.fromLatLngZoom(mapCenterGms, 12f)
+                }
+                val uiSettings = remember {
+                    MapUiSettings(
+                        compassEnabled = false,
+                        mapToolbarEnabled = false,
+                        myLocationButtonEnabled = false,
+                        rotationGesturesEnabled = false,
+                        tiltGesturesEnabled = false,
+                        scrollGesturesEnabled = false,
+                        zoomGesturesEnabled = true,
+                        zoomControlsEnabled = false
+                    )
+                }
+                
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
+                    uiSettings = uiSettings
+                ) {
+                    // Map loaded callback
+                    MapEffect { googleMap ->
+                        googleMap.setOnMapLoadedCallback { mapLoaded = true }
                     }
-                },
-                update = { /* no-op for now */ }
-            )
-
-            // Radius overlay and center marker drawn in Compose
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val centerX = size.width / 2
-                val centerY = size.height / 2
-                val maxRadius = minOf(size.width, size.height) / 2 * 0.8f
-                val radiusPixels = (radiusValue / 50f) * maxRadius // visual scaling up to 50 miles
-
-                // Ring
-                drawCircle(
-                    color = Color(0xFF007AFF),
-                    radius = radiusPixels,
-                    center = Offset(centerX, centerY),
-                    style = Stroke(width = 3.dp.toPx())
-                )
-                // Fill
-                drawCircle(
-                    color = Color(0xFF007AFF).copy(alpha = 0.15f),
-                    radius = radiusPixels,
-                    center = Offset(centerX, centerY)
-                )
-                // Center marker
-                drawCircle(
-                    color = Color(0xFF007AFF),
-                    radius = 8.dp.toPx(),
-                    center = Offset(centerX, centerY)
-                )
-                drawCircle(
-                    color = Color.White,
-                    radius = 4.dp.toPx(),
-                    center = Offset(centerX, centerY)
-                )
+                    
+                    // Center marker for the selected city
+                    Marker(
+                        state = MarkerState(position = mapCenterGms),
+                        title = selectedCity,
+                        snippet = "Selected location"
+                    )
+                    
+                    // Sample nearby locations (you can replace with real data)
+                    val nearbyLocations = remember {
+                        listOf(
+                            LatLng(lat + 0.01, lng + 0.01) to "Coffee Shop",
+                            LatLng(lat - 0.008, lng + 0.015) to "Restaurant",
+                            LatLng(lat + 0.005, lng - 0.012) to "Park",
+                            LatLng(lat - 0.015, lng - 0.008) to "Shopping Center",
+                            LatLng(lat + 0.012, lng + 0.008) to "Library",
+                            LatLng(lat - 0.005, lng + 0.018) to "Hospital"
+                        )
+                    }
+                    
+                    // Add markers for nearby locations
+                    nearbyLocations.forEach { (location, name) ->
+                        Marker(
+                            state = MarkerState(position = location),
+                            title = name
+                        )
+                    }
+                    
+                    // Radius circle
+                    Circle(
+                        center = mapCenterGms,
+                        radius = (radiusValue * 1609.34).toDouble(),
+                        strokeColor = Color(0xFF007AFF),
+                        strokeWidth = 3f,
+                        fillColor = Color(0xFF007AFF).copy(alpha = 0.15f)
+                    )
+                }
+            } else {
+                // Fallback Canvas map when no Google API key
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    // iOS-style map background
+                    val bg = Color(0xFFF2F2F7)
+                    drawRect(bg)
+                    
+                    // Park areas (green)
+                    val parkColor = Color(0xFFC8E6C9)
+                    drawRect(parkColor, Offset(size.width * 0.1f, size.height * 0.2f), androidx.compose.ui.geometry.Size(size.width * 0.25f, size.height * 0.15f))
+                    drawRect(parkColor, Offset(size.width * 0.7f, size.height * 0.6f), androidx.compose.ui.geometry.Size(size.width * 0.2f, size.height * 0.25f))
+                    
+                    // Water bodies (blue)
+                    val waterColor = Color(0xFF64B5F6)
+                    drawRect(waterColor, Offset(size.width * 0.05f, size.height * 0.7f), androidx.compose.ui.geometry.Size(size.width * 0.3f, size.height * 0.1f))
+                    
+                    // Road network (white)
+                    val roadColor = Color.White
+                    val roadWidth = 4.dp.toPx()
+                    // Main horizontal roads
+                    drawLine(roadColor, Offset(0f, size.height * 0.3f), Offset(size.width, size.height * 0.3f), roadWidth)
+                    drawLine(roadColor, Offset(0f, size.height * 0.6f), Offset(size.width, size.height * 0.6f), roadWidth)
+                    // Main vertical roads
+                    drawLine(roadColor, Offset(size.width * 0.4f, 0f), Offset(size.width * 0.4f, size.height), roadWidth)
+                    drawLine(roadColor, Offset(size.width * 0.7f, 0f), Offset(size.width * 0.7f, size.height), roadWidth)
+                    // Secondary roads
+                    drawLine(roadColor, Offset(0f, size.height * 0.15f), Offset(size.width * 0.6f, size.height * 0.15f), 2.dp.toPx())
+                    drawLine(roadColor, Offset(size.width * 0.2f, 0f), Offset(size.width * 0.2f, size.height * 0.8f), 2.dp.toPx())
+                    
+                    // Building blocks (light gray)
+                    val buildingColor = Color(0xFFE0E0E0)
+                    drawRect(buildingColor, Offset(size.width * 0.45f, size.height * 0.1f), androidx.compose.ui.geometry.Size(size.width * 0.15f, size.height * 0.15f))
+                    drawRect(buildingColor, Offset(size.width * 0.15f, size.height * 0.35f), androidx.compose.ui.geometry.Size(size.width * 0.2f, size.height * 0.2f))
+                    drawRect(buildingColor, Offset(size.width * 0.75f, size.height * 0.1f), androidx.compose.ui.geometry.Size(size.width * 0.2f, size.height * 0.4f))
+                    
+                    // Radius circle and center marker
+                    val centerX = size.width / 2
+                    val centerY = size.height / 2
+                    val maxRadius = minOf(size.width, size.height) / 2 * 0.8f
+                    val radiusPixels = (radiusValue / 25f) * maxRadius
+                    val blue = Color(0xFF007AFF)
+                    
+                    // Radius circle
+                    drawCircle(color = blue.copy(alpha = 0.15f), radius = radiusPixels, center = Offset(centerX, centerY))
+                    drawCircle(color = blue, radius = radiusPixels, center = Offset(centerX, centerY), style = Stroke(width = 3.dp.toPx()))
+                    
+                    // Center marker
+                    drawCircle(color = blue, radius = 8.dp.toPx(), center = Offset(centerX, centerY))
+                    drawCircle(color = Color.White, radius = 4.dp.toPx(), center = Offset(centerX, centerY))
+                }
+                
+                // Mark as loaded for Canvas fallback
+                LaunchedEffect(Unit) {
+                    mapLoaded = true
+                }
+            }
+            
+            // Loading indicator
+            if (!mapLoaded) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "Loading map…",
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
             // City label matching iOS style
@@ -161,8 +249,8 @@ fun RadiusSelectionScreen(
                     radiusValue = it
                     onRadiusChanged(it.toDouble()) 
                 },
-                valueRange = 1f..50f,
-                steps = 48,
+                valueRange = 1f..25f,
+                steps = 24,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = Color(0xFF007AFF),
@@ -172,7 +260,7 @@ fun RadiusSelectionScreen(
             )
 
             Text(
-                text = "Radius: ${'$'}{radiusValue.toInt()} miles",
+                text = "Radius: ${radiusValue.toInt()} miles",
                 color = Color.White,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium
@@ -180,25 +268,6 @@ fun RadiusSelectionScreen(
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        // Page indicator
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            repeat(4) { index ->
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(
-                            if (index == 1) Color(0xFF4A90E2) else Color.Gray,
-                            RoundedCornerShape(4.dp)
-                        )
-                )
-                if (index < 3) Spacer(modifier = Modifier.width(8.dp))
-            }
-        }
     }
 }
-// Note: For an accurate geodesic radius, next step is to render a polygon buffer (meters)
-// as a FillLayer in Mapbox using the Annotation API or GeoJSON source.
+// Note: Google Maps Compose Circle uses meters for radius.
