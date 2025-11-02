@@ -50,7 +50,7 @@ class UserPreferences(context: Context) {
     val playlistGeneration: StateFlow<Boolean> = _playlistGeneration.asStateFlow()
     
     private val _hasCompletedOnboarding = MutableStateFlow(getBoolean(KEY_ONBOARDING_COMPLETED, false))
-    val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding
+    val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
     
     // Save functions
     fun setLoggedIn(isLoggedIn: Boolean) {

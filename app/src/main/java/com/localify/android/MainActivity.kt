@@ -169,6 +169,10 @@ class MainActivity : ComponentActivity() {
                                 eventId = selectedEventId,
                                 onNavigateBack = {
                                     currentScreen = Screen.HOME
+                                },
+                                onNavigateToArtistDetail = { artistId ->
+                                    selectedArtistId = artistId
+                                    currentScreen = Screen.ARTIST_DETAIL
                                 }
                             )
                         }

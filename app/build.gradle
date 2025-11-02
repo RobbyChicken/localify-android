@@ -19,8 +19,18 @@ android {
             useSupportLibrary true
         }
         // Google Maps API key placeholder (optional). If absent, app will fallback to OSM.
+        // Load from .env file, environment variable, or gradle property
+        def envFile = rootProject.file('.env')
+        def envApiKey = ""
+        if (envFile.exists()) {
+            envFile.readLines().each { line ->
+                if (line.startsWith('GOOGLE_MAPS_API_KEY=')) {
+                    envApiKey = line.substring('GOOGLE_MAPS_API_KEY='.length())
+                }
+            }
+        }
         manifestPlaceholders = [
-            MAPS_API_KEY: System.getenv('GOOGLE_MAPS_API_KEY') ?: (project.findProperty('MAPS_API_KEY') ?: "")
+            MAPS_API_KEY: envApiKey ?: System.getenv('GOOGLE_MAPS_API_KEY') ?: (project.findProperty('MAPS_API_KEY') ?: "")
         ]
     }
 
@@ -52,13 +62,13 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
-    implementation 'androidx.activity:activity-compose:1.7.0'
+    implementation 'androidx.activity:activity-compose:1.7.2'
     implementation 'androidx.compose.ui:ui:1.4.3'
     implementation 'androidx.compose.ui:ui-graphics:1.4.3'
     implementation 'androidx.compose.ui:ui-tooling-preview:1.4.3'
-    implementation 'androidx.compose.material3:material3:1.1.0'
+    implementation 'androidx.compose.material3:material3:1.0.0-alpha14'
     implementation 'androidx.compose.material:material-icons-extended:1.4.3'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     

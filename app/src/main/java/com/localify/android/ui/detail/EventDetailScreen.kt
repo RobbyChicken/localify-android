@@ -1,7 +1,10 @@
 package com.localify.android.ui.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,7 +37,8 @@ import com.localify.android.data.models.Artist
 @Composable
 fun EventDetailScreen(
     eventId: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToArtistDetail: (String) -> Unit = {}
 ) {
     // Mock event data for now
     val mockEvent = Event(
@@ -76,41 +80,16 @@ fun EventDetailScreen(
             .background(Color.Black)
             .verticalScroll(rememberScrollState())
     ) {
-        // Hero Section
-        Box(
+        // Header with Back Button and Title
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(400.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Background Image
-            AsyncImage(
-                model = mockEvent.imageUrl,
-                contentDescription = "${mockEvent.name} image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Gradient Overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.7f)
-                            ),
-                            startY = 0f,
-                            endY = 1000f
-                        )
-                    )
-            )
-            
-            // Back Button
             IconButton(
                 onClick = onNavigateBack,
                 modifier = Modifier
-                    .padding(16.dp)
                     .background(
                         Color.Black.copy(alpha = 0.5f),
                         CircleShape
@@ -123,99 +102,113 @@ fun EventDetailScreen(
                 )
             }
             
-            // Event Info
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = mockEvent.name,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp
-                    ),
-                    color = Color.White
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Text(
+                text = mockEvent.artists.firstOrNull()?.name ?: "Artist",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White
+            )
+        }
+        
+        // Event Image Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .padding(horizontal = 24.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = mockEvent.imageUrl,
+                    contentDescription = "${mockEvent.name} image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = mockEvent.date,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${mockEvent.venue.name} • ${mockEvent.venue.city.name}, ${mockEvent.venue.city.state}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
-                }
+                // Bookmark icon
+                Icon(
+                    imageVector = Icons.Default.LocationOn, // Using LocationOn as bookmark placeholder
+                    contentDescription = "Bookmark",
+                    tint = Color(0xFF007AFF),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .size(24.dp)
+                )
             }
         }
         
-        // Action Buttons
-        Row(
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Event Details
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Button(
-                onClick = { /* TODO: Open ticket URL */ },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE91E63) // Localify pink
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Get Tickets")
-            }
+            Text(
+                text = mockEvent.name,
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp
+                ),
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
             
-            OutlinedButton(
-                onClick = { /* TODO: Add to calendar */ },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color.White
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CalendarToday,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add to Calendar")
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = mockEvent.venue.name,
+                style = MaterialTheme.typography.titleLarge,
+                color = Color(0xFF007AFF),
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = "${mockEvent.venue.city.name}, ${mockEvent.venue.city.state}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = mockEvent.date,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // View Event Tickets Button
+        Button(
+            onClick = { /* TODO: Open ticket URL */ },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFE91E63) // Localify pink
+            ),
+            shape = RoundedCornerShape(25.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.OpenInNew,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("View Event Tickets")
         }
         
         // Description Section
@@ -244,13 +237,15 @@ fun EventDetailScreen(
             }
         }
         
-        // Artists Section
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // Performing Artists Section
         if (mockEvent.artists.isNotEmpty()) {
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp)
             ) {
                 Text(
-                    text = "Artists",
+                    text = "Performing Artists",
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -259,110 +254,76 @@ fun EventDetailScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                mockEvent.artists.forEach { artist ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF1A1A1A)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // First artist from the event
+                    mockEvent.artists.firstOrNull()?.let { artist ->
+                        PerformingArtistCard(
+                            name = artist.name,
+                            subtitle = "North Smithfield,...", // Mock subtitle
+                            imageUrl = artist.imageUrl,
+                            onClick = { onNavigateToArtistDetail(artist.id) }
                         )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AsyncImage(
-                                model = artist.imageUrl,
-                                contentDescription = artist.name,
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                            
-                            Spacer(modifier = Modifier.width(16.dp))
-                            
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = artist.name,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color.White
-                                )
-                                
-                                Spacer(modifier = Modifier.height(4.dp))
-                                
-                                Text(
-                                    text = artist.genres.joinToString(", "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                            }
-                            
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                tint = Color(0xFFE91E63),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
                     }
+                    
+                    // Add the second artist as shown in the design
+                    PerformingArtistCard(
+                        name = "David Rawlings",
+                        subtitle = "North Smithfield,...",
+                        imageUrl = "https://via.placeholder.com/80x80/666666/ffffff?text=DR",
+                        onClick = { onNavigateToArtistDetail("david_rawlings") }
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
         
-        // Venue Section
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1A1A1A)
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Text(
-                    text = "Venue",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = Color.White
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = mockEvent.venue.name,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = Color.White
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = mockEvent.venue.address,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-                
-                Text(
-                    text = "${mockEvent.venue.city.name}, ${mockEvent.venue.city.state} ${mockEvent.venue.city.country}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-            }
-        }
-        
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun PerformingArtistCard(
+    name: String,
+    subtitle: String,
+    imageUrl: String,
+    onClick: () -> Unit = {}
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(100.dp)
+            .clickable { onClick() }
+    ) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = name,
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+        
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
     }
 }

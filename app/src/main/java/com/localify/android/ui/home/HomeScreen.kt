@@ -276,7 +276,9 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
+                        Text(
+                            text = "Loading...",
+                            style = MaterialTheme.typography.bodyLarge,
                             color = Color(0xFFE91E63)
                         )
                     }

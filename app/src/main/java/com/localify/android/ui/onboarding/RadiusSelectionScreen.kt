@@ -184,7 +184,7 @@ fun RadiusSelectionScreen(
                     val centerX = size.width / 2
                     val centerY = size.height / 2
                     val maxRadius = minOf(size.width, size.height) / 2 * 0.8f
-                    val radiusPixels = (radiusValue / 25f) * maxRadius
+                    val radiusPixels = (radiusValue / 50f) * maxRadius
                     val blue = Color(0xFF007AFF)
                     
                     // Radius circle
@@ -249,8 +249,8 @@ fun RadiusSelectionScreen(
                     radiusValue = it
                     onRadiusChanged(it.toDouble()) 
                 },
-                valueRange = 1f..25f,
-                steps = 24,
+                valueRange = 1f..50f,
+                steps = 49,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = Color(0xFF007AFF),
