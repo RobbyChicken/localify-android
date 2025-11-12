@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MusicNote
@@ -40,38 +42,41 @@ fun EventDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToArtistDetail: (String) -> Unit = {}
 ) {
-    // Mock event data for now
+    // State for bookmark functionality
+    var isBookmarked by remember { mutableStateOf(false) }
+    
+    // Mock event data to match Randy Travis mockup
     val mockEvent = Event(
         id = eventId,
-        name = "Ray LaMontagne Live in Concert",
+        name = "Randy Travis",
         imageUrl = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
-        date = "March 15, 2024 • 8:00 PM",
+        date = "Thursday, November 20, 2025, 7:00 PM EST",
         venue = Venue(
             id = "venue1",
-            name = "The Capitol Theatre",
-            address = "149 Westchester Ave",
+            name = "Broome County Forum Theatre",
+            address = "236 Washington St",
             city = City(
                 id = "city1",
-                name = "Port Chester",
+                name = "Binghamton",
                 state = "NY",
                 country = "USA",
-                latitude = 41.0018,
-                longitude = -73.6651
+                latitude = 42.0987,
+                longitude = -75.9180
             )
         ),
         artists = listOf(
             Artist(
-                id = "artist1",
-                name = "Ray LaMontagne",
-                imageUrl = "https://via.placeholder.com/300x300/666666/ffffff?text=RL",
-                genres = listOf("Folk", "Indie Rock"),
-                bio = "Ray LaMontagne is an American singer-songwriter known for his raspy voice.",
-                spotifyId = "2UazAtjfzqBF0Nho2awK4z",
-                popularity = 75
+                id = "randy_travis",
+                name = "Randy Travis",
+                imageUrl = "https://via.placeholder.com/80x80/666666/ffffff?text=RT",
+                genres = listOf("Country", "Gospel"),
+                bio = "Randy Travis is an American country music and gospel music singer.",
+                spotifyId = "0Y5tJX1MQlPlqiwlOH1tJY",
+                popularity = 85
             )
         ),
         ticketUrl = "https://example.com/tickets",
-        description = "An intimate evening with Ray LaMontagne featuring songs from his latest album and classic hits."
+        description = "An evening with country music legend Randy Travis."
     )
 
     Column(
@@ -130,15 +135,23 @@ fun EventDetailScreen(
                 )
                 
                 // Bookmark icon
-                Icon(
-                    imageVector = Icons.Default.LocationOn, // Using LocationOn as bookmark placeholder
-                    contentDescription = "Bookmark",
-                    tint = Color(0xFF007AFF),
+                IconButton(
+                    onClick = { isBookmarked = !isBookmarked },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .size(24.dp)
-                )
+                        .background(
+                            Color.Black.copy(alpha = 0.5f),
+                            CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                        tint = if (isBookmarked) Color(0xFF007AFF) else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
         
@@ -261,7 +274,7 @@ fun EventDetailScreen(
                     mockEvent.artists.firstOrNull()?.let { artist ->
                         PerformingArtistCard(
                             name = artist.name,
-                            subtitle = "North Smithfield,...", // Mock subtitle
+                            subtitle = "Marshville, NC", // Mock subtitle
                             imageUrl = artist.imageUrl,
                             onClick = { onNavigateToArtistDetail(artist.id) }
                         )

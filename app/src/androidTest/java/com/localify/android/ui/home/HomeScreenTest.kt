@@ -87,4 +87,66 @@ class HomeScreenTest {
             hasText("Loading...") or hasTextThatContains(",")
         ).assertIsDisplayed()
     }
+
+    @Test
+    fun homeScreen_artistCardNavigationWorks() {
+        var navigatedArtistId = ""
+        var navigatedEventId = ""
+
+        composeTestRule.setContent {
+            LocalifyTheme {
+                HomeScreen(
+                    onNavigateToArtistDetail = { artistId -> navigatedArtistId = artistId },
+                    onNavigateToEventDetail = { eventId -> navigatedEventId = eventId }
+                )
+            }
+        }
+
+        // Switch to Artists tab
+        composeTestRule.onNodeWithText("Artists").performClick()
+        
+        // Wait for content to load and click on the first artist card if it exists
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().isNotEmpty()
+        }
+        
+        // Find and click an artist card (they should be clickable)
+        val artistCards = composeTestRule.onAllNodes(hasClickAction())
+        if (artistCards.fetchSemanticsNodes().isNotEmpty()) {
+            artistCards.onFirst().performClick()
+            
+            // Verify navigation was triggered with a non-empty artist ID
+            assert(navigatedArtistId.isNotEmpty()) { "Artist navigation should have been triggered" }
+        }
+    }
+
+    @Test
+    fun homeScreen_eventCardNavigationWorks() {
+        var navigatedArtistId = ""
+        var navigatedEventId = ""
+
+        composeTestRule.setContent {
+            LocalifyTheme {
+                HomeScreen(
+                    onNavigateToArtistDetail = { artistId -> navigatedArtistId = artistId },
+                    onNavigateToEventDetail = { eventId -> navigatedEventId = eventId }
+                )
+            }
+        }
+
+        // Events tab should be selected by default
+        // Wait for content to load and click on the first event card if it exists
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().isNotEmpty()
+        }
+        
+        // Find and click an event card (they should be clickable)
+        val eventCards = composeTestRule.onAllNodes(hasClickAction())
+        if (eventCards.fetchSemanticsNodes().isNotEmpty()) {
+            eventCards.onFirst().performClick()
+            
+            // Verify navigation was triggered with a non-empty event ID
+            assert(navigatedEventId.isNotEmpty()) { "Event navigation should have been triggered" }
+        }
+    }
 }

@@ -346,7 +346,8 @@ fun HomeScreen(
                                                     userPreferences.addFavoriteEvent(event.id)
                                                 }
                                             },
-                                            isFavorited = favoriteEvents.contains(event.id)
+                                            isFavorited = favoriteEvents.contains(event.id),
+                                            onEventClick = { onNavigateToEventDetail(event.id) }
                                         )
                                     }
                                 }
@@ -422,6 +423,7 @@ fun HomeScreen(
                                                 }
                                             },
                                             isFavorited = favoriteArtists.contains(artist.id),
+                                            onArtistClick = { onNavigateToArtistDetail(artist.id) },
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)

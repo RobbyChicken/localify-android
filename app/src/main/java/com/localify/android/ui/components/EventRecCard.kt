@@ -33,13 +33,14 @@ fun EventRecCard(
     event: EventRecResponse,
     onFavoriteClick: () -> Unit,
     isFavorited: Boolean,
+    onEventClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable { /* TODO: Navigate to event detail */ },
+            .clickable { onEventClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)),
         shape = RoundedCornerShape(16.dp)

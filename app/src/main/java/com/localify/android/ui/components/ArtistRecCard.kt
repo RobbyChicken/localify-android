@@ -31,6 +31,7 @@ fun ArtistRecCard(
     artist: ArtistRecResponse,
     onFavoriteClick: () -> Unit,
     isFavorited: Boolean,
+    onArtistClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Show error state if artist data is invalid
@@ -73,7 +74,7 @@ fun ArtistRecCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable { /* TODO: Navigate to artist detail */ },
+            .clickable { onArtistClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)),
         shape = RoundedCornerShape(16.dp)
