@@ -42,14 +42,18 @@ fun EventRecCard(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable { onEventClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
+            // Image Section
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+            ) {
             // Event Image - try multiple possible image fields
             val imageUrl = event.imageUrl ?: event.artists.firstOrNull()?.image
             imageUrl?.let { url ->
@@ -76,21 +80,6 @@ fun EventRecCard(
                         )
                 )
             }
-            
-            // Gradient overlay for text readability
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.8f)
-                            ),
-                            startY = 100f
-                        )
-                    )
-            )
             
             // Date/Time overlay (top-left)
             Box(
@@ -146,14 +135,15 @@ fun EventRecCard(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
-            // Content overlay at bottom
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
+        }
+        
+        // Info section with gray background
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF2A2A2A))
+                .padding(12.dp)
+        ) {
                 // Location overlay
                 event.venue?.let { venue ->
                     Row(
@@ -181,7 +171,7 @@ fun EventRecCard(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
                 // Event Name
                 Text(
@@ -207,7 +197,7 @@ fun EventRecCard(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 // Bottom section with play button and match percentage
                 Row(

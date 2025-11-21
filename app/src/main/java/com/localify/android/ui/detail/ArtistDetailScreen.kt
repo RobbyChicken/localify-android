@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import com.localify.android.data.models.Artist
 import com.localify.android.data.models.Event
@@ -334,9 +335,14 @@ private fun ArtistDetailContent(
                 items(3) { index ->
                     val artistNames = listOf("Caveman Produc...", "21st Hapilos", "RazzAttack Muzik")
                     val artistIds = listOf("artist2", "artist3", "artist4") // Mock artist IDs
+                    val artistImages = listOf(
+                        "https://images.unsplash.com/photo-1516280440614-37939bbacd81?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+                        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+                        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
+                    )
                     SimilarArtistCard(
                         name = artistNames[index],
-                        imageUrl = "https://via.placeholder.com/80x80/E91E63/ffffff?text=${artistNames[index].first()}",
+                        imageUrl = artistImages[index],
                         onClick = { onNavigateToArtistDetail(artistIds[index]) } // Navigate to artist detail
                     )
                 }
@@ -398,8 +404,10 @@ private fun SimilarArtistCard(
             modifier = Modifier
                 .size(80.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE91E63)),
-            contentScale = ContentScale.Crop
+                .background(Color(0xFF2A2A2A)),
+            contentScale = ContentScale.Crop,
+            error = painterResource(android.R.drawable.ic_menu_gallery),
+            placeholder = painterResource(android.R.drawable.ic_menu_gallery)
         )
         
         Spacer(modifier = Modifier.height(8.dp))

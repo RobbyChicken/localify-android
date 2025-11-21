@@ -68,7 +68,7 @@ fun EventDetailScreen(
             Artist(
                 id = "randy_travis",
                 name = "Randy Travis",
-                imageUrl = "https://via.placeholder.com/80x80/666666/ffffff?text=RT",
+                imageUrl = "https://images.unsplash.com/photo-1516280440614-37939bbacd81?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
                 genres = listOf("Country", "Gospel"),
                 bio = "Randy Travis is an American country music and gospel music singer.",
                 spotifyId = "0Y5tJX1MQlPlqiwlOH1tJY",
@@ -284,7 +284,7 @@ fun EventDetailScreen(
                     PerformingArtistCard(
                         name = "David Rawlings",
                         subtitle = "North Smithfield,...",
-                        imageUrl = "https://via.placeholder.com/80x80/666666/ffffff?text=DR",
+                        imageUrl = "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
                         onClick = { onNavigateToArtistDetail("david_rawlings") }
                     )
                 }
@@ -315,7 +315,8 @@ private fun PerformingArtistCard(
             contentDescription = name,
             modifier = Modifier
                 .size(80.dp)
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .background(Color(0xFF2A2A2A)),
             contentScale = ContentScale.Crop
         )
         

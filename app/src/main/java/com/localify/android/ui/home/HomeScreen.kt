@@ -37,6 +37,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import com.localify.android.data.models.Event
 import com.localify.android.data.models.Artist
 import com.localify.android.ui.components.EventCard
@@ -62,6 +68,14 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context) }
+    
+    // System UI handling
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as androidx.activity.ComponentActivity).window
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.BLACK
+    }
     
     // Update debug info when UI state changes
     LaunchedEffect(uiState) {
@@ -92,15 +106,22 @@ fun HomeScreen(
     var showEndDatePicker by remember { mutableStateOf(false) }
     
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { showCityModal = true }
+                        modifier = Modifier
+                            .clickable { showCityModal = true }
+                            .background(
+                                Color(0xFF2A2A2A),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = uiState.currentCity?.name ?: "Loading...",
+                            text = uiState.currentCity?.name?.split(",")?.firstOrNull()?.trim() ?: "Loading...",
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White

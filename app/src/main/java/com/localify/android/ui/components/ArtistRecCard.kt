@@ -76,14 +76,18 @@ fun ArtistRecCard(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable { onArtistClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(400.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
+            // Image Section
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(320.dp)
+            ) {
             // Artist Image with fallback to a colored background
             if (!artist.image.isNullOrEmpty()) {
                 val painter = rememberAsyncImagePainter(
@@ -133,21 +137,6 @@ fun ArtistRecCard(
                 }
             }
             
-            // Gradient overlay for text readability
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.7f)
-                            ),
-                            startY = 200f
-                        )
-                    )
-            )
-            
             // Favorite button (top right)
             IconButton(
                 onClick = onFavoriteClick,
@@ -167,14 +156,15 @@ fun ArtistRecCard(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
-            // Content overlay at bottom
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
+        }
+        
+        // Info section with gray background
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF2A2A2A))
+                .padding(16.dp)
+        ) {
                 // Artist Name
                 Text(
                     text = artist.name,
