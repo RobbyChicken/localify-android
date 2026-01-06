@@ -18,6 +18,7 @@ import com.localify.android.ui.profile.ProfileScreen
 import com.localify.android.ui.onboarding.OnboardingScreen
 import com.localify.android.ui.theme.LocalifyTheme
 import com.localify.android.data.local.UserPreferences
+import com.localify.android.data.network.NetworkModule
 
 enum class Screen {
     LOGIN,
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NetworkModule.init(this)
         userPreferences = UserPreferences(this)
         
         setContent {

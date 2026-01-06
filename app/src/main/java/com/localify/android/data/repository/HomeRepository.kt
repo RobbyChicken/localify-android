@@ -26,9 +26,9 @@ class HomeRepository {
         }
     }
     
-    suspend fun getUserCities(authToken: String): UserCityResponse {
+    suspend fun getUserCities(): UserCityResponse {
         Log.d("HomeRepository", "Getting user cities")
-        val response = apiService.getUserCities("Bearer $authToken")
+        val response = apiService.getUserCities()
         Log.d("HomeRepository", "User cities response: ${response.code()}")
         if (response.isSuccessful) {
             val cities = response.body()!!
@@ -40,7 +40,6 @@ class HomeRepository {
             // Step 1: Add default city (New York, NY)
             val defaultCityId = "bb5dbc41-213b-45c6-8eb3-523fcb3e85f6" // NYC UUID from staging server
             val addCityResponse = apiService.addUserCity(
-                "Bearer $authToken", 
                 defaultCityId, 
                 com.localify.android.data.network.AddCityRequest(radius = 50.0)
             )
@@ -60,7 +59,7 @@ class HomeRepository {
                         "7e4783bd-405c-43b8-9c6b-4a4a4a07cd5f"  // Taylor Swift Ambientonia
                     )
                 )
-                val seedsResponse = apiService.addUserSeeds("Bearer $authToken", seedsRequest)
+                val seedsResponse = apiService.addUserSeeds(seedsRequest)
                 if (seedsResponse.isSuccessful) {
                     Log.d("HomeRepository", "Successfully added default seeds")
                 } else {
@@ -72,23 +71,49 @@ class HomeRepository {
             
             // Step 3: Retry getting cities
             Log.d("HomeRepository", "Successfully added default city, retrying getUserCities")
-            return getUserCities(authToken)
+            return getUserCities()
         } else {
             val errorBody = response.errorBody()?.string()
             Log.e("HomeRepository", "Failed to get user cities: ${response.code()}, body: $errorBody")
             throw Exception("Failed to get user cities: ${response.code()} - $errorBody")
         }
     }
+
+    suspend fun setUserCity(cityId: String, radius: Double): UserCityResponse {
+        Log.d("HomeRepository", "Setting user city: cityId=$cityId radius=$radius")
+
+        val upsert = apiService.putUserCity(cityId, com.localify.android.data.network.AddCityRequest(radius = radius))
+        if (!upsert.isSuccessful) {
+            val errorBody = upsert.errorBody()?.string()
+            Log.e("HomeRepository", "Failed to set user city: ${upsert.code()}, body: $errorBody")
+            throw Exception("Failed to set user city: ${upsert.code()} - $errorBody")
+        }
+
+        // Some backends require an explicit selection change.
+        try {
+            val select = apiService.patchUserCity(
+                cityId,
+                com.localify.android.data.network.PatchUserCityRequest(selected = true, radius = radius)
+            )
+            if (!select.isSuccessful) {
+                Log.w("HomeRepository", "City selection PATCH failed: ${select.code()}")
+            }
+        } catch (e: Exception) {
+            Log.w("HomeRepository", "City selection PATCH failed: ${e.message}")
+        }
+
+        return getUserCities()
+    }
     
-    suspend fun getArtistRecommendations(authToken: String, cityId: String, limit: Int = 20): List<ArtistRecResponse> {
+    suspend fun getArtistRecommendations(cityId: String, limit: Int = 20): List<ArtistRecResponse> {
         try {
             Log.d("HomeRepository", "=== GET ARTIST RECOMMENDATIONS ===")
             Log.d("HomeRepository", "City ID: $cityId")
             Log.d("HomeRepository", "Limit: $limit")
-            Log.d("HomeRepository", "Auth token: ${authToken.take(10)}...")
+            Log.d("HomeRepository", "Auth token: handled by interceptor")
             
             val response = try {
-                apiService.getArtistRecommendations("Bearer $authToken", cityId, limit)
+                apiService.getArtistRecommendations(cityId, limit)
             } catch (e: Exception) {
                 Log.e("HomeRepository", "API call failed: ${e.message}", e)
                 return emptyList()
@@ -137,12 +162,12 @@ class HomeRepository {
         }
     }
     
-    suspend fun getEventRecommendations(authToken: String, cityId: String, request: com.localify.android.data.network.EventRecommendationsRequest = com.localify.android.data.network.EventRecommendationsRequest()): List<EventRecResponse> {
+    suspend fun getEventRecommendations(cityId: String, request: com.localify.android.data.network.EventRecommendationsRequest = com.localify.android.data.network.EventRecommendationsRequest()): List<EventRecResponse> {
         Log.d("HomeRepository", "Getting event recommendations for city: $cityId")
         Log.d("HomeRepository", "Request params: startDate=${request.startDate}, endDate=${request.endDate}, limit=${request.limit}")
         
         return try {
-            val response = apiService.getEventRecommendations("Bearer $authToken", cityId, request)
+            val response = apiService.getEventRecommendations(cityId, request)
             
             if (response.isSuccessful) {
                 val events = response.body() ?: emptyList()

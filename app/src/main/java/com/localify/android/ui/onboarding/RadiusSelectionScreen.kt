@@ -19,9 +19,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.LaunchedEffect
 // Google Maps (primary provider when key present)
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.Circle as GmsCircle
+import com.google.android.gms.maps.model.CircleOptions
 import com.google.maps.android.compose.*
+import kotlin.math.cos
 
 @Composable
 fun RadiusSelectionScreen(
@@ -86,6 +91,8 @@ fun RadiusSelectionScreen(
                 val cameraPositionState = rememberCameraPositionState {
                     position = CameraPosition.fromLatLngZoom(mapCenterGms, 12f)
                 }
+                val radiusMeters = remember(radiusValue) { (radiusValue * 1609.34f).toDouble() }
+                var radiusCircle by remember { mutableStateOf<GmsCircle?>(null) }
                 val uiSettings = remember {
                     MapUiSettings(
                         compassEnabled = false,
@@ -99,14 +106,41 @@ fun RadiusSelectionScreen(
                     )
                 }
                 
+                LaunchedEffect(radiusMeters) {
+                    try {
+                        val bounds = boundsForRadius(mapCenterGms, radiusMeters)
+
+                        cameraPositionState.animate(
+                            update = CameraUpdateFactory.newLatLngBounds(bounds, 64),
+                            durationMs = 450
+                        )
+                    } catch (_: Exception) {
+                        // Best-effort: if bounds computation fails, keep existing camera.
+                    }
+                }
+                
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
                     uiSettings = uiSettings
                 ) {
                     // Map loaded callback
-                    MapEffect { googleMap ->
+                    MapEffect(radiusMeters) { googleMap ->
                         googleMap.setOnMapLoadedCallback { mapLoaded = true }
+
+                        if (radiusCircle == null) {
+                            radiusCircle = googleMap.addCircle(
+                                CircleOptions()
+                                    .center(mapCenterGms)
+                                    .radius(radiusMeters)
+                                    .strokeColor(android.graphics.Color.rgb(0, 122, 255))
+                                    .strokeWidth(4f)
+                                    .fillColor(android.graphics.Color.argb(38, 0, 122, 255))
+                            )
+                        } else {
+                            radiusCircle?.center = mapCenterGms
+                            radiusCircle?.radius = radiusMeters
+                        }
                     }
                     
                     // Center marker for the selected city
@@ -135,15 +169,6 @@ fun RadiusSelectionScreen(
                             title = name
                         )
                     }
-                    
-                    // Radius circle
-                    Circle(
-                        center = mapCenterGms,
-                        radius = (radiusValue * 1609.34).toDouble(),
-                        strokeColor = Color(0xFF007AFF),
-                        strokeWidth = 3f,
-                        fillColor = Color(0xFF007AFF).copy(alpha = 0.15f)
-                    )
                 }
             } else {
                 // Fallback Canvas map when no Google API key
@@ -271,3 +296,16 @@ fun RadiusSelectionScreen(
     }
 }
 // Note: Google Maps Compose Circle uses meters for radius.
+
+private fun boundsForRadius(center: LatLng, radiusMeters: Double): LatLngBounds {
+    val metersPerDegreeLat = 111_320.0
+    val latDelta = radiusMeters / metersPerDegreeLat
+
+    val latRadians = Math.toRadians(center.latitude)
+    val metersPerDegreeLng = metersPerDegreeLat * cos(latRadians)
+    val lngDelta = if (metersPerDegreeLng == 0.0) 0.0 else radiusMeters / metersPerDegreeLng
+
+    val southWest = LatLng(center.latitude - latDelta, center.longitude - lngDelta)
+    val northEast = LatLng(center.latitude + latDelta, center.longitude + lngDelta)
+    return LatLngBounds(southWest, northEast)
+}

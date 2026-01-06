@@ -12,6 +12,7 @@ import com.localify.android.data.network.ArtistRecResponse
 import com.localify.android.data.network.EventRecResponse
 import com.localify.android.data.network.EventRecommendationsRequest
 import com.localify.android.data.network.UserCity
+import com.localify.android.data.network.NetworkModule
 import com.localify.android.data.repository.HomeRepository
 
 enum class HomeTab {
@@ -54,11 +55,12 @@ class HomeViewModel(
                 println("DEBUG: Creating guest user...")
                 val authResponse = homeRepository.createGuestUser()
                 val authToken = authResponse.token
+                NetworkModule.storeAuth(authResponse)
                 println("DEBUG: Got auth token: ${authToken.take(20)}...")
                 
                 // Get user cities
                 println("DEBUG: Getting user cities...")
-                val userCities = homeRepository.getUserCities(authToken)
+                val userCities = homeRepository.getUserCities()
                 val currentCity = userCities.current
                 println("DEBUG: Got current city: ${currentCity.name}")
                 
@@ -89,17 +91,32 @@ class HomeViewModel(
             }
         }
     }
+
+    fun changeCity(cityId: String, radiusMiles: Double) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                val cities = homeRepository.setUserCity(cityId = cityId, radius = radiusMiles)
+                _uiState.value = _uiState.value.copy(currentCity = cities.current)
+                loadRecommendations()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to change city"
+                )
+            }
+        }
+    }
     
     fun loadRecommendations() {
         viewModelScope.launch {
             val currentState = _uiState.value
-            val authToken = currentState.authToken
             val cityId = currentState.currentCity?.id?.toString()
             
             println("DEBUG: loadRecommendations() - Starting with cityId: $cityId")
             
-            if (authToken == null || cityId == null) {
-                val errorMsg = "Missing authentication or city information. Auth token: ${authToken?.take(10)}..., City ID: $cityId"
+            if (cityId == null) {
+                val errorMsg = "Missing city information. City ID: $cityId"
                 println("DEBUG: $errorMsg")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -115,7 +132,7 @@ class HomeViewModel(
                 // Load artist recommendations
                 val artists = try {
                     println("DEBUG: Starting artist recommendations fetch...")
-                    val artists = homeRepository.getArtistRecommendations(authToken, cityId)
+                    val artists = homeRepository.getArtistRecommendations(cityId)
                     println("DEBUG: Successfully fetched ${artists.size} artists")
                     
                     // Log artist details for debugging
@@ -145,7 +162,7 @@ class HomeViewModel(
                         startDate = currentState.startDate,
                         endDate = currentState.endDate
                     )
-                    val events = homeRepository.getEventRecommendations(authToken, cityId, request)
+                    val events = homeRepository.getEventRecommendations(cityId, request)
                     println("DEBUG: Successfully loaded ${events.size} events")
                     events
                 } catch (e: Exception) {

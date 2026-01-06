@@ -104,6 +104,16 @@ fun HomeScreen(
     var endDate by remember { mutableStateOf("Sep 8, 2025") }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
+
+    var locationLabel by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(uiState.currentCity?.name) {
+        val cityName = uiState.currentCity?.name
+        if (cityName.isNullOrBlank()) {
+            locationLabel = null
+            return@LaunchedEffect
+        }
+        locationLabel = cityDisplayName(cityName)
+    }
     
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -121,7 +131,7 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = uiState.currentCity?.name?.split(",")?.firstOrNull()?.trim() ?: "Loading...",
+                            text = locationLabel ?: "Loading...",
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -467,9 +477,11 @@ fun HomeScreen(
     if (showCityModal) {
         CitySelectionModal(
             isVisible = showCityModal,
+            currentCity = uiState.currentCity?.name ?: "",
+            currentRadius = uiState.currentCity?.radius?.toInt() ?: 50,
             onDismiss = { showCityModal = false },
-            onCityChange = { city ->
-                // TODO: Handle city change
+            onCitySelected = { city, radiusMiles ->
+                viewModel.changeCity(cityId = city.id, radiusMiles = radiusMiles.toDouble())
                 showCityModal = false
             }
         )
@@ -625,6 +637,12 @@ fun HomeScreen(
             )
         }
     }
+}
+
+private fun cityDisplayName(raw: String): String {
+    val commaCity = raw.split(",").firstOrNull()?.trim().orEmpty()
+    if (commaCity.isNotBlank() && commaCity != raw) return commaCity
+    return raw.removeSuffix(" County").trim()
 }
 
 @Composable

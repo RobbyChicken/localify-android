@@ -16,6 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.localify.android.data.network.CityResponse
+import com.localify.android.data.network.NetworkModule
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun CitySelectionModal(
@@ -23,18 +27,86 @@ fun CitySelectionModal(
     currentCity: String = "Ithaca, NY",
     currentRadius: Int = 50,
     onDismiss: () -> Unit,
-    onCityChange: (String) -> Unit
+    onCitySelected: (CityResponse, Int) -> Unit
 ) {
     var radius by remember { mutableStateOf(currentRadius) }
     var showCitySearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var searchResults by remember { mutableStateOf<List<CityResponse>>(emptyList()) }
+    var suggestedCities by remember { mutableStateOf<List<CityResponse>>(emptyList()) }
+    var isLoadingSuggestions by remember { mutableStateOf(false) }
+    var suggestionError by remember { mutableStateOf<String?>(null) }
+    val apiService = remember { NetworkModule.apiService }
+
+    LaunchedEffect(showCitySearch) {
+        if (!showCitySearch) return@LaunchedEffect
+        if (suggestedCities.isNotEmpty()) return@LaunchedEffect
+
+        isLoadingSuggestions = true
+        suggestionError = null
+        try {
+            val response = withContext(Dispatchers.IO) {
+                apiService.getUserNearestCities()
+            }
+            if (response.isSuccessful) {
+                val cities = response.body()?.cities.orEmpty()
+                suggestedCities = cities.map {
+                    CityResponse(
+                        id = it.id,
+                        name = it.name,
+                        state = null,
+                        country = it.countryCode ?: "",
+                        latitude = it.latitude,
+                        longitude = it.longitude
+                    )
+                }
+            } else {
+                suggestionError = "Failed to load nearby cities (${response.code()})"
+            }
+        } catch (e: Exception) {
+            suggestionError = e.message ?: "Failed to load nearby cities"
+        } finally {
+            isLoadingSuggestions = false
+        }
+    }
+
+    LaunchedEffect(showCitySearch, searchQuery) {
+        if (!showCitySearch) return@LaunchedEffect
+        if (searchQuery.length < 2) {
+            searchResults = emptyList()
+            searchError = null
+            return@LaunchedEffect
+        }
+
+        isSearching = true
+        searchError = null
+        try {
+            val response = withContext(Dispatchers.IO) {
+                apiService.searchCities(searchQuery, limit = 20)
+            }
+            if (response.isSuccessful) {
+                searchResults = response.body().orEmpty()
+            } else {
+                val errorBody = response.errorBody()?.string()
+                searchError = "Failed to search cities (${response.code()})"
+                searchResults = emptyList()
+            }
+        } catch (e: Exception) {
+            searchError = e.message ?: "Failed to search cities"
+            searchResults = emptyList()
+        } finally {
+            isSearching = false
+        }
+    }
     
     if (isVisible) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.8f))
-                .clickable { onDismiss() },
+                .clickable(enabled = !showCitySearch) { onDismiss() },
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -81,7 +153,7 @@ fun CitySelectionModal(
                     ) {
                         Column {
                             Text(
-                                text = currentCity,
+                                text = currentCity.split(",").firstOrNull()?.trim() ?: currentCity,
                                 color = Color.White,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
@@ -216,55 +288,72 @@ fun CitySelectionModal(
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // All available cities
-                val allCities = listOf(
-                    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Miami, FL",
-                    "Houston, TX", "Phoenix, AZ", "Philadelphia, PA", "San Antonio, TX",
-                    "San Diego, CA", "Dallas, TX", "San Jose, CA", "Austin, TX",
-                    "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
-                    "San Francisco, CA", "Indianapolis, IN", "Seattle, WA", "Denver, CO",
-                    "Washington, DC", "Boston, MA", "El Paso, TX", "Nashville, TN",
-                    "Detroit, MI", "Oklahoma City, OK", "Portland, OR", "Las Vegas, NV",
-                    "Memphis, TN", "Louisville, KY", "Baltimore, MD", "Milwaukee, WI",
-                    "Albuquerque, NM", "Tucson, AZ", "Fresno, CA", "Sacramento, CA",
-                    "Atlanta, GA", "Kansas City, MO", "Colorado Springs, CO", "Omaha, NE",
-                    "Raleigh, NC", "Miami Beach, FL", "Virginia Beach, VA", "Oakland, CA",
-                    "Minneapolis, MN", "Tulsa, OK", "Arlington, TX", "New Orleans, LA",
-                    "Wichita, KS", "Cleveland, OH", "Tampa, FL", "Bakersfield, CA",
-                    "Aurora, CO", "Honolulu, HI", "Anaheim, CA", "Santa Ana, CA",
-                    "Corpus Christi, TX", "Riverside, CA", "Lexington, KY", "Stockton, CA",
-                    "Henderson, NV", "Saint Paul, MN", "St. Louis, MO", "Cincinnati, OH",
-                    "Pittsburgh, PA", "Greensboro, NC", "Anchorage, AK", "Plano, TX",
-                    "Lincoln, NE", "Orlando, FL", "Irvine, CA", "Newark, NJ",
-                    "Durham, NC", "Chula Vista, CA", "Toledo, OH", "Fort Wayne, IN",
-                    "St. Petersburg, FL", "Laredo, TX", "Jersey City, NJ", "Chandler, AZ",
-                    "Madison, WI", "Lubbock, TX", "Scottsdale, AZ", "Reno, NV",
-                    "Buffalo, NY", "Gilbert, AZ", "Glendale, AZ", "North Las Vegas, NV",
-                    "Winston-Salem, NC", "Chesapeake, VA", "Norfolk, VA", "Fremont, CA",
-                    "Garland, TX", "Irving, TX", "Hialeah, FL", "Richmond, VA",
-                    "Boise, ID", "Spokane, WA", "Baton Rouge, LA"
-                )
-                
-                // Filter cities based on search query
-                val filteredCities = if (searchQuery.isBlank()) {
-                    allCities.take(10) // Show first 10 cities when no search
-                } else {
-                    allCities.filter { 
-                        it.contains(searchQuery, ignoreCase = true) 
-                    }.take(20) // Show up to 20 matching cities
-                }
-                
                 Text(
-                    text = if (searchQuery.isBlank()) "Popular Cities" else "Search Results (${filteredCities.size})",
+                    text = if (searchQuery.length < 2) "Nearby Cities" else "Search Results (${searchResults.size})",
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))
-                
-                if (filteredCities.isEmpty() && searchQuery.isNotBlank()) {
+
+                if (searchQuery.length < 2) {
+                    when {
+                        isLoadingSuggestions -> {
+                            CircularProgressIndicator(color = Color(0xFFE91E63))
+                        }
+                        suggestionError != null -> {
+                            Text(
+                                text = suggestionError ?: "",
+                                color = Color.Gray,
+                                modifier = Modifier.padding(16.dp),
+                                fontSize = 14.sp
+                            )
+                        }
+                        suggestedCities.isEmpty() -> {
+                            Text(
+                                text = "No nearby cities available",
+                                color = Color.Gray,
+                                modifier = Modifier.padding(16.dp),
+                                fontSize = 14.sp
+                            )
+                        }
+                        else -> {
+                            suggestedCities.take(20).forEach { city ->
+                                val cityLabel = city.name
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clickable {
+                                            onCitySelected(city, radius)
+                                            showCitySearch = false
+                                            searchQuery = ""
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = Color(0xFF333333)
+                                    )
+                                ) {
+                                    Text(
+                                        text = cityLabel,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(16.dp),
+                                        fontSize = 16.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (isSearching) {
+                    CircularProgressIndicator(color = Color(0xFFE91E63))
+                } else if (searchError != null) {
+                    Text(
+                        text = searchError ?: "",
+                        color = Color.Gray,
+                        modifier = Modifier.padding(16.dp),
+                        fontSize = 14.sp
+                    )
+                } else if (searchResults.isEmpty() && searchQuery.length >= 2) {
                     Text(
                         text = "No cities found matching \"$searchQuery\"",
                         color = Color.Gray,
@@ -272,13 +361,14 @@ fun CitySelectionModal(
                         fontSize = 14.sp
                     )
                 } else {
-                    filteredCities.forEach { city ->
+                    searchResults.forEach { city ->
+                        val cityLabel = listOfNotNull(city.name, city.state).joinToString(", ")
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .clickable {
-                                    onCityChange(city)
+                                    onCitySelected(city, radius)
                                     showCitySearch = false
                                     searchQuery = "" // Reset search
                                 },
@@ -287,7 +377,7 @@ fun CitySelectionModal(
                             )
                         ) {
                             Text(
-                                text = city,
+                                text = cityLabel,
                                 color = Color.White,
                                 modifier = Modifier.padding(16.dp),
                                 fontSize = 16.sp

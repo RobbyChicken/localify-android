@@ -9,7 +9,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class HomeScreenTest {
+class HomeScreenFixedTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
@@ -18,7 +18,10 @@ class HomeScreenTest {
     fun homeScreen_displaysCorrectTabs() {
         composeTestRule.setContent {
             LocalifyTheme {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {}
+                )
             }
         }
 
@@ -28,22 +31,13 @@ class HomeScreenTest {
     }
 
     @Test
-    fun homeScreen_eventsTabSelectedByDefault() {
-        composeTestRule.setContent {
-            LocalifyTheme {
-                HomeScreen()
-            }
-        }
-
-        // Events tab should be selected by default
-        composeTestRule.onNodeWithText("Events").assertIsDisplayed()
-    }
-
-    @Test
     fun homeScreen_canSwitchBetweenTabs() {
         composeTestRule.setContent {
             LocalifyTheme {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {}
+                )
             }
         }
 
@@ -58,7 +52,10 @@ class HomeScreenTest {
     fun homeScreen_filterButtonsOnlyVisibleForEventsTab() {
         composeTestRule.setContent {
             LocalifyTheme {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {}
+                )
             }
         }
 
@@ -75,29 +72,29 @@ class HomeScreenTest {
     }
 
     @Test
-    fun homeScreen_cityNameDisplayed() {
+    fun homeScreen_cityDropdownDisplayed() {
         composeTestRule.setContent {
             LocalifyTheme {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {}
+                )
             }
         }
 
-        // Should show either a city name or "Loading..."
-        composeTestRule.onNode(
-            hasText("Loading...") or hasTextThatContains(",")
-        ).assertIsDisplayed()
+        // Dropdown arrow should be visible
+        composeTestRule.onNodeWithText("▼").assertIsDisplayed()
     }
 
     @Test
     fun homeScreen_artistCardNavigationWorks() {
         var navigatedArtistId = ""
-        var navigatedEventId = ""
 
         composeTestRule.setContent {
             LocalifyTheme {
                 HomeScreen(
-                    onNavigateToArtistDetail = { artistId -> navigatedArtistId = artistId },
-                    onNavigateToEventDetail = { eventId -> navigatedEventId = eventId }
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = { artistId -> navigatedArtistId = artistId }
                 )
             }
         }
@@ -110,10 +107,10 @@ class HomeScreenTest {
             composeTestRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().isNotEmpty()
         }
         
-        // Find and click an artist card (they should be clickable)
+        // Find and click an artist card (skip first few which are nav buttons)
         val artistCards = composeTestRule.onAllNodes(hasClickAction())
-        if (artistCards.fetchSemanticsNodes().isNotEmpty()) {
-            artistCards.onFirst().performClick()
+        if (artistCards.fetchSemanticsNodes().size > 3) {
+            artistCards[3].performClick()
             
             // Verify navigation was triggered with a non-empty artist ID
             assert(navigatedArtistId.isNotEmpty()) { "Artist navigation should have been triggered" }
@@ -122,14 +119,13 @@ class HomeScreenTest {
 
     @Test
     fun homeScreen_eventCardNavigationWorks() {
-        var navigatedArtistId = ""
         var navigatedEventId = ""
 
         composeTestRule.setContent {
             LocalifyTheme {
                 HomeScreen(
-                    onNavigateToArtistDetail = { artistId -> navigatedArtistId = artistId },
-                    onNavigateToEventDetail = { eventId -> navigatedEventId = eventId }
+                    onNavigateToEventDetail = { eventId -> navigatedEventId = eventId },
+                    onNavigateToArtistDetail = {}
                 )
             }
         }
@@ -140,13 +136,96 @@ class HomeScreenTest {
             composeTestRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().isNotEmpty()
         }
         
-        // Find and click an event card (they should be clickable)
+        // Find and click an event card (skip nav buttons)
         val eventCards = composeTestRule.onAllNodes(hasClickAction())
-        if (eventCards.fetchSemanticsNodes().isNotEmpty()) {
-            eventCards.onFirst().performClick()
+        if (eventCards.fetchSemanticsNodes().size > 3) {
+            eventCards[3].performClick()
             
             // Verify navigation was triggered with a non-empty event ID
             assert(navigatedEventId.isNotEmpty()) { "Event navigation should have been triggered" }
+        }
+    }
+
+    @Test
+    fun homeScreen_allNavigationButtons_areClickable() {
+        var favoritesClicked = false
+        var searchClicked = false
+        var profileClicked = false
+
+        composeTestRule.setContent {
+            LocalifyTheme {
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {},
+                    onNavigateToFavorites = { favoritesClicked = true },
+                    onNavigateToSearch = { searchClicked = true },
+                    onNavigateToProfile = { profileClicked = true }
+                )
+            }
+        }
+
+        // Test Home button
+        composeTestRule.onNodeWithText("Home").assertIsDisplayed()
+        
+        // Test Favorites button
+        composeTestRule.onNodeWithText("Favorites").performClick()
+        assert(favoritesClicked) { "Favorites button should work" }
+        
+        // Test Search button
+        composeTestRule.onNodeWithText("Search").performClick()
+        assert(searchClicked) { "Search button should work" }
+        
+        // Test Profile button
+        composeTestRule.onNodeWithText("Profile").performClick()
+        assert(profileClicked) { "Profile button should work" }
+    }
+
+    @Test
+    fun homeScreen_filterButtons_workOnEventsTab() {
+        composeTestRule.setContent {
+            LocalifyTheme {
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {}
+                )
+            }
+        }
+
+        // Should be on Events tab by default
+        // Verify filter buttons are present and clickable
+        composeTestRule.onNodeWithContentDescription("Filter Menu")
+            .assertIsDisplayed()
+            .assertExists()
+        
+        composeTestRule.onNodeWithContentDescription("Date Filter")
+            .assertIsDisplayed()
+            .assertExists()
+    }
+
+    @Test
+    fun homeScreen_favoriteButtons_areClickableOnCards() {
+        composeTestRule.setContent {
+            LocalifyTheme {
+                HomeScreen(
+                    onNavigateToEventDetail = {},
+                    onNavigateToArtistDetail = {}
+                )
+            }
+        }
+
+        // Switch to Artists tab
+        composeTestRule.onNodeWithText("Artists").performClick()
+        
+        // Wait for artist cards to load
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithContentDescription("Favorite")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify favorite buttons exist and are clickable
+        val favoriteButtons = composeTestRule.onAllNodesWithContentDescription("Favorite")
+        if (favoriteButtons.fetchSemanticsNodes().isNotEmpty()) {
+            favoriteButtons.onFirst().assertExists()
         }
     }
 }

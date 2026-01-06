@@ -185,4 +185,161 @@ class NavigationTest {
             bookmarkButton.assertExists()
         }
     }
+
+    @Test
+    fun artistDetailScreen_spotifyButtonWorks() {
+        composeTestRule.setContent {
+            LocalifyTheme {
+                ArtistDetailScreen(
+                    artistId = "test_artist_id",
+                    onNavigateBack = { },
+                    onNavigateToEventDetail = { }
+                )
+            }
+        }
+
+        // Wait for content to load
+        composeTestRule.waitUntil(timeoutMillis = 3000) {
+            composeTestRule.onAllNodesWithText("Listen on Spotify").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Spotify button should exist and be clickable
+        composeTestRule.onNodeWithText("Listen on Spotify")
+            .assertExists()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun artistDetailScreen_songPreviewButtonWorks() {
+        composeTestRule.setContent {
+            LocalifyTheme {
+                ArtistDetailScreen(
+                    artistId = "test_artist_id",
+                    onNavigateBack = { },
+                    onNavigateToEventDetail = { }
+                )
+            }
+        }
+
+        // Wait for content to load
+        composeTestRule.waitUntil(timeoutMillis = 3000) {
+            composeTestRule.onAllNodesWithText("Song Preview").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Song preview button should exist and be clickable
+        composeTestRule.onNodeWithText("Song Preview")
+            .assertExists()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun artistDetailScreen_similarArtistsAreClickable() {
+        composeTestRule.setContent {
+            LocalifyTheme {
+                ArtistDetailScreen(
+                    artistId = "test_artist_id",
+                    onNavigateBack = { },
+                    onNavigateToEventDetail = { }
+                )
+            }
+        }
+
+        // Wait for similar artists section
+        composeTestRule.waitUntil(timeoutMillis = 3000) {
+            composeTestRule.onNodeWithText("Similar Artists").isDisplayed()
+        }
+
+        // Similar Artists header should be visible
+        composeTestRule.onNodeWithText("Similar Artists").assertIsDisplayed()
+        
+        // Verify there are clickable elements in the similar artists section
+        val clickableNodes = composeTestRule.onAllNodes(hasClickAction())
+        assert(clickableNodes.fetchSemanticsNodes().size > 2) {
+            "Should have clickable similar artist cards"
+        }
+    }
+
+    @Test
+    fun artistDetailScreen_upcomingEventsAreClickable() {
+        var navigatedEventId = ""
+
+        composeTestRule.setContent {
+            LocalifyTheme {
+                ArtistDetailScreen(
+                    artistId = "test_artist_id",
+                    onNavigateBack = { },
+                    onNavigateToEventDetail = { eventId -> navigatedEventId = eventId }
+                )
+            }
+        }
+
+        // Wait for upcoming events section
+        composeTestRule.waitUntil(timeoutMillis = 3000) {
+            composeTestRule.onNodeWithText("Upcoming Events").isDisplayed()
+        }
+
+        // Upcoming Events header should be visible
+        composeTestRule.onNodeWithText("Upcoming Events").assertIsDisplayed()
+        
+        // Verify there are clickable event cards
+        val clickableNodes = composeTestRule.onAllNodes(hasClickAction())
+        assert(clickableNodes.fetchSemanticsNodes().size > 1) {
+            "Should have clickable event cards"
+        }
+    }
+
+    @Test
+    fun eventDetailScreen_viewTicketsButtonWorks() {
+        composeTestRule.setContent {
+            LocalifyTheme {
+                EventDetailScreen(
+                    eventId = "test_event_id",
+                    onNavigateBack = { },
+                    onNavigateToArtistDetail = { }
+                )
+            }
+        }
+
+        // View Event Tickets button should be visible and clickable
+        composeTestRule.onNodeWithText("View Event Tickets")
+            .assertExists()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun eventDetailScreen_performingArtistsAreClickable() {
+        var navigatedArtistId = ""
+
+        composeTestRule.setContent {
+            LocalifyTheme {
+                EventDetailScreen(
+                    eventId = "test_event_id",
+                    onNavigateBack = { },
+                    onNavigateToArtistDetail = { artistId -> navigatedArtistId = artistId }
+                )
+            }
+        }
+
+        // Wait for performing artists section
+        composeTestRule.waitUntil(timeoutMillis = 3000) {
+            composeTestRule.onNodeWithText("Performing Artists").isDisplayed()
+        }
+
+        // Click Randy Travis artist card
+        composeTestRule.onNodeWithText("Randy Travis").performClick()
+        
+        // Verify navigation was triggered
+        assert(navigatedArtistId.isNotEmpty()) {
+            "Clicking performing artist should trigger navigation"
+        }
+    }
+
+    private fun SemanticsNodeInteraction.isDisplayed(): Boolean {
+        return try {
+            assertIsDisplayed()
+            true
+        } catch (e: AssertionError) {
+            false
+        }
+    }
 }
