@@ -51,6 +51,14 @@ class UserPreferences(context: Context) {
     
     private val _hasCompletedOnboarding = MutableStateFlow(getBoolean(KEY_ONBOARDING_COMPLETED, false))
     val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
+
+    fun getFavoriteArtistsSnapshot(): Set<String> {
+        return getStringSet(KEY_FAVORITE_ARTISTS, emptySet())
+    }
+
+    fun getFavoriteEventsSnapshot(): Set<String> {
+        return getStringSet(KEY_FAVORITE_EVENTS, emptySet())
+    }
     
     // Save functions
     fun setLoggedIn(isLoggedIn: Boolean) {
