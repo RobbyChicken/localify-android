@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.localify.android.data.network.GenreV1Response
 
 data class Genre(
     val name: String,
@@ -21,23 +22,10 @@ data class Genre(
 
 @Composable
 fun GenreSelectionScreen(
-    selectedGenres: Set<String>,
-    onGenresChanged: (Set<String>) -> Unit
+    selectedGenreIds: Set<String>,
+    genres: List<GenreV1Response>,
+    onGenresChanged: (selectedIds: Set<String>, selectedNames: Set<String>) -> Unit
 ) {
-    val genres = listOf(
-        Genre("Alternative Rock", "Imagine Dragons, R.E.M., Twenty One Pilots"),
-        Genre("Blues", "Robert Johnson, Marcus King, Hozier"),
-        Genre("Country", "Johnny Cash, Taylor Swift, Morgan Wallen"),
-        Genre("Disco", "Donna Summer, Katy Perry, ABBA"),
-        Genre("EDM", "Avicii, Martin Garrix, Zedd"),
-        Genre("Folk", "Joni Mitchell, Ed Sheeran, Shawn Mendes"),
-        Genre("Funk", "Parliament Funkadelic, Prince, The Neighbourhood"),
-        Genre("Grunge", "Nirvana, Pearl Jam, Queens of the Stone Age"),
-        Genre("Hip Hop", "Drake, JAY-Z, Feid"),
-        Genre("House", "Frankie Knuckles, FISHER, Carl Cox"),
-        Genre("Indie Rock", "Arcade Fire, The Strokes, Arctic Monkeys")
-    )
-    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,7 +61,7 @@ fun GenreSelectionScreen(
                     modifier = Modifier
                         .size(12.dp)
                         .background(
-                            if (index < selectedGenres.size) Color(0xFFE91E63) else Color.Gray,
+                            if (index < selectedGenreIds.size) Color(0xFFE91E63) else Color.Gray,
                             RoundedCornerShape(6.dp)
                         )
                 )
@@ -89,19 +77,20 @@ fun GenreSelectionScreen(
         ) {
             items(genres) { genre ->
                 GenreItem(
-                    genre = genre,
-                    isSelected = selectedGenres.contains(genre.name),
+                    genre = Genre(genre.name, ""),
+                    isSelected = selectedGenreIds.contains(genre.id),
                     onToggle = {
-                        val newGenres = if (selectedGenres.contains(genre.name)) {
-                            selectedGenres - genre.name
+                        val newIds = if (selectedGenreIds.contains(genre.id)) {
+                            selectedGenreIds - genre.id
                         } else {
-                            if (selectedGenres.size < 5) {
-                                selectedGenres + genre.name
+                            if (selectedGenreIds.size < 5) {
+                                selectedGenreIds + genre.id
                             } else {
-                                selectedGenres
+                                selectedGenreIds
                             }
                         }
-                        onGenresChanged(newGenres)
+                        val newNames = genres.filter { newIds.contains(it.id) }.map { it.name }.toSet()
+                        onGenresChanged(newIds, newNames)
                     }
                 )
             }

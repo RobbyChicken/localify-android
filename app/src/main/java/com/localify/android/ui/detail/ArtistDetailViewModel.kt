@@ -13,10 +13,17 @@ import com.localify.android.data.models.Venue
 import com.localify.android.data.local.UserPreferences
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import com.localify.android.data.network.NetworkModule
+import com.localify.android.data.network.EventV1Response
+import retrofit2.Response
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ArtistDetailViewModel(application: Application) : AndroidViewModel(application) {
     
     private val userPreferences = UserPreferences(application)
+    private val apiService = NetworkModule.apiService
     
     private val _uiState = MutableStateFlow(ArtistDetailUiState())
     val uiState: StateFlow<ArtistDetailUiState> = _uiState.asStateFlow()
@@ -26,15 +33,65 @@ class ArtistDetailViewModel(application: Application) : AndroidViewModel(applica
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
             try {
-                // Create mock artist data since backend doesn't have individual artist endpoints yet
-                val mockArtist = createMockArtist(artistId)
-                val mockEvents = createMockEvents(artistId)
-                val isFavorite = userPreferences.favoriteArtists.value.contains(artistId)
-                
+                val artistResponse = apiService.getArtistV1(artistId)
+                if (!artistResponse.isSuccessful) {
+                    val errorBody = artistResponse.errorBody()?.string()
+                    throw Exception("Failed to load artist (${artistResponse.code()}) - $errorBody")
+                }
+
+                val citiesResponse = apiService.getArtistCitiesV1(artistId)
+                if (!citiesResponse.isSuccessful) {
+                    val errorBody = citiesResponse.errorBody()?.string()
+                    throw Exception("Failed to load artist cities (${citiesResponse.code()}) - $errorBody")
+                }
+
+                val eventsResponse = apiService.getArtistEventsV1(artistId)
+                if (!eventsResponse.isSuccessful) {
+                    val errorBody = eventsResponse.errorBody()?.string()
+                    throw Exception("Failed to load artist events (${eventsResponse.code()}) - $errorBody")
+                }
+
+                val artistV1 = artistResponse.body() ?: throw Exception("Empty artist response")
+                val citiesV1 = citiesResponse.body().orEmpty()
+                val eventsV1 = eventsResponse.body()
+
+                val artist = Artist(
+                    id = artistV1.id,
+                    name = artistV1.name,
+                    imageUrl = artistV1.image ?: "",
+                    genres = artistV1.genres.map { it.name },
+                    bio = "",
+                    spotifyId = artistV1.spotifyId ?: "",
+                    popularity = 0
+                )
+
+                val upcomingEvents = buildList {
+                    eventsV1?.nearbyEvents?.forEach { add(it.toUiEvent()) }
+                    eventsV1?.otherEvents?.forEach { add(it.toUiEvent()) }
+                }.distinctBy { it.id }
+
+                val localCities = citiesV1.map { it.name }
+
+                val similarArtists = artistV1.similarArtists.map {
+                    Artist(
+                        id = it.id,
+                        name = it.name,
+                        imageUrl = it.image ?: "",
+                        genres = emptyList(),
+                        bio = "",
+                        spotifyId = "",
+                        popularity = 0
+                    )
+                }
+
+                val isFavorite = userPreferences.getFavoriteArtistsSnapshot().contains(artistId)
+
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    artist = mockArtist,
-                    upcomingEvents = mockEvents,
+                    artist = artist,
+                    upcomingEvents = upcomingEvents,
+                    localCities = localCities,
+                    similarArtists = similarArtists,
                     isFavorite = isFavorite
                 )
             } catch (e: Exception) {
@@ -46,65 +103,49 @@ class ArtistDetailViewModel(application: Application) : AndroidViewModel(applica
         }
     }
     
-    private fun createMockArtist(artistId: String): Artist {
-        // Create mock artist data for any ID
-        // Use a hash of the ID to generate consistent but varied data
-        val hash = artistId.hashCode()
-        val artistNames = listOf("Kurt Riley", "Randy Travis", "Alex Morgan", "Sarah Chen", "David Wilson")
-        val genresList = listOf(
-            listOf("Cold Wave", "Riddim", "Metapop"),
-            listOf("Country", "Gospel"),
-            listOf("Indie Rock", "Alternative"),
-            listOf("Electronic", "Ambient"),
-            listOf("Folk", "Acoustic")
-        )
-        val images = listOf(
-            "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
-            "https://images.unsplash.com/photo-1516280440614-37939bbacd81?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80",
-            "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80"
-        )
-        
-        val nameIndex = kotlin.math.abs(hash) % artistNames.size
-        val genreIndex = kotlin.math.abs(hash) % genresList.size
-        val imageIndex = kotlin.math.abs(hash) % images.size
-        
-        return Artist(
-            id = artistId,
-            name = artistNames[nameIndex],
-            imageUrl = images[imageIndex],
-            genres = genresList[genreIndex],
-            bio = "${artistNames[nameIndex]} is a talented musician known for their unique style and captivating performances.",
-            spotifyId = "${artistId}_spotify",
-            popularity = 50 + (kotlin.math.abs(hash) % 50)
+    private fun EventV1Response.toUiEvent(): Event {
+        val dateText = formatMillis(startTime)
+        return Event(
+            id = id,
+            name = name,
+            imageUrl = "",
+            date = dateText,
+            venue = Venue(
+                id = venue.id,
+                name = venue.name,
+                address = venue.address,
+                city = City(
+                    id = venue.city.id,
+                    name = venue.city.name,
+                    state = "",
+                    country = venue.city.countryCode ?: "",
+                    latitude = venue.city.latitude,
+                    longitude = venue.city.longitude
+                )
+            ),
+            artists = topArtists.map {
+                Artist(
+                    id = it.id,
+                    name = it.name,
+                    imageUrl = it.image ?: "",
+                    genres = emptyList(),
+                    bio = "",
+                    spotifyId = it.spotifyId ?: "",
+                    popularity = 0
+                )
+            },
+            ticketUrl = ticketUrl ?: "",
+            description = ""
         )
     }
-    
-    private fun createMockEvents(artistId: String): List<Event> {
-        // Create mock events for the artist
-        return listOf(
-            Event(
-                id = "${artistId}_event_1",
-                name = "Live Concert",
-                imageUrl = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
-                date = "December 15, 2025 • 8:00 PM",
-                venue = Venue(
-                    id = "venue_1",
-                    name = "The Music Hall",
-                    address = "123 Music St",
-                    city = City(
-                        id = "city_1",
-                        name = "Ithaca",
-                        state = "NY",
-                        country = "USA",
-                        latitude = 42.4440,
-                        longitude = -76.5019
-                    )
-                ),
-                artists = listOf(createMockArtist(artistId)),
-                ticketUrl = "https://example.com/tickets",
-                description = "An amazing live performance."
-            )
-        )
+
+    private fun formatMillis(millis: Long): String {
+        return try {
+            val formatter = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault())
+            formatter.format(Date(millis))
+        } catch (_: Exception) {
+            millis.toString()
+        }
     }
     
     fun toggleFavorite() {
@@ -113,22 +154,47 @@ class ArtistDetailViewModel(application: Application) : AndroidViewModel(applica
         
         viewModelScope.launch {
             try {
-                if (currentFavorite) {
-                    userPreferences.removeFavoriteArtist(currentArtist.id)
-                } else {
+                val nextFavorite = !currentFavorite
+                _uiState.value = _uiState.value.copy(isFavorite = nextFavorite)
+
+                if (nextFavorite) {
                     userPreferences.addFavoriteArtist(currentArtist.id)
+                    val resp = callWithGuestAuthRetry {
+                        apiService.addFavorite(type = "artists", id = currentArtist.id)
+                    }
+                    if (!resp.isSuccessful) throw Exception("Failed to add favorite (${resp.code()})")
+                } else {
+                    userPreferences.removeFavoriteArtist(currentArtist.id)
+                    val resp = callWithGuestAuthRetry {
+                        apiService.removeFavorite(type = "artists", id = currentArtist.id)
+                    }
+                    if (!resp.isSuccessful) throw Exception("Failed to remove favorite (${resp.code()})")
                 }
-                
-                _uiState.value = _uiState.value.copy(
-                    isFavorite = !currentFavorite
-                )
             } catch (e: Exception) {
-                // Revert on error
-                _uiState.value = _uiState.value.copy(
-                    isFavorite = currentFavorite
-                )
+                if (currentFavorite) {
+                    userPreferences.addFavoriteArtist(currentArtist.id)
+                } else {
+                    userPreferences.removeFavoriteArtist(currentArtist.id)
+                }
+                _uiState.value = _uiState.value.copy(isFavorite = currentFavorite)
             }
         }
+    }
+
+    private suspend fun <T> callWithGuestAuthRetry(block: suspend () -> Response<T>): Response<T> {
+        val initial = block()
+        if (initial.code() != 401) return initial
+
+        val guest = apiService.createGuestUser()
+        if (guest.isSuccessful) {
+            val auth = guest.body()
+            if (auth != null) {
+                NetworkModule.storeAuth(auth)
+                return block()
+            }
+        }
+
+        return initial
     }
     
 }
@@ -137,6 +203,8 @@ data class ArtistDetailUiState(
     val isLoading: Boolean = false,
     val artist: Artist? = null,
     val upcomingEvents: List<Event> = emptyList(),
+    val localCities: List<String> = emptyList(),
+    val similarArtists: List<Artist> = emptyList(),
     val isFavorite: Boolean = false,
     val error: String? = null
 )

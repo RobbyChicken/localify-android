@@ -187,7 +187,11 @@ fun FavoritesScreen(
                                 items(uiState.favoriteArtists) { artist ->
                                     ArtistCard(
                                         artist = artist,
-                                        onArtistClick = { onNavigateToArtistDetail(artist.id) }
+                                        onArtistClick = { onNavigateToArtistDetail(artist.id) },
+                                        isFavoriteOverride = true,
+                                        onFavoriteClick = { shouldFavorite ->
+                                            viewModel.setFavoriteArtist(artist.id, shouldFavorite)
+                                        }
                                     )
                                 }
                             }
@@ -207,7 +211,11 @@ fun FavoritesScreen(
                                     EventCard(
                                         event = event,
                                         onEventClick = { onNavigateToEventDetail(event.id) },
-                                        onArtistClick = { onNavigateToArtistDetail(event.artists.firstOrNull()?.id ?: "") }
+                                        onArtistClick = { onNavigateToArtistDetail(event.artists.firstOrNull()?.id ?: "") },
+                                        isBookmarkedOverride = true,
+                                        onBookmarkClick = { shouldFavorite ->
+                                            viewModel.setFavoriteEvent(event.id, shouldFavorite)
+                                        }
                                     )
                                 }
                             }
@@ -227,7 +235,11 @@ fun FavoritesScreen(
                                     EventCard(
                                         event = event,
                                         onEventClick = { onNavigateToEventDetail(event.id) },
-                                        onArtistClick = { onNavigateToArtistDetail(event.artists.firstOrNull()?.id ?: "") }
+                                        onArtistClick = { onNavigateToArtistDetail(event.artists.firstOrNull()?.id ?: "") },
+                                        isBookmarkedOverride = true,
+                                        onBookmarkClick = { shouldFavorite ->
+                                            viewModel.setFavoriteEvent(event.id, shouldFavorite)
+                                        }
                                     )
                                 }
                             }

@@ -15,6 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.localify.android.data.local.UserPreferences
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,25 +27,38 @@ fun OnboardingScreen(
 ) {
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context) }
+    val onboardingViewModel: OnboardingViewModel = viewModel(
+        factory = ViewModelProvider.AndroidViewModelFactory.getInstance(context.applicationContext as android.app.Application)
+    )
+    val onboardingUiState by onboardingViewModel.uiState.collectAsState()
     
     var currentStep by remember { mutableStateOf(0) }
     val totalSteps = 4
     
     // State for each step
-    var selectedCity by remember { mutableStateOf("") }
+    var selectedCityId by remember { mutableStateOf("") }
+    var selectedCityLabel by remember { mutableStateOf("") }
     var radius by remember { mutableStateOf(10.0) }
     var selectedGenres by remember { mutableStateOf(setOf<String>()) }
+    var selectedGenreIds by remember { mutableStateOf(setOf<String>()) }
     var selectedArtists by remember { mutableStateOf(setOf<String>()) }
     
     // Loading state for completion
     var isCompletingOnboarding by remember { mutableStateOf(false) }
     var completionError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(onboardingUiState.error) {
+        onboardingUiState.error?.let {
+            completionError = it
+            isCompletingOnboarding = false
+        }
+    }
     
     // Determine if next/done button should be enabled
     val isNextEnabled = when (currentStep) {
-        0 -> selectedCity.isNotEmpty()
+        0 -> selectedCityId.isNotEmpty()
         1 -> true // Radius is always valid
-        2 -> selectedGenres.size >= 3
+        2 -> selectedGenreIds.size >= 3
         3 -> selectedArtists.size >= 5
         else -> false
     }
@@ -118,16 +133,24 @@ fun OnboardingScreen(
                             isCompletingOnboarding = true
                             
                             // Save all onboarding data to UserPreferences
-                            userPreferences.setSelectedCity(selectedCity)
+                            userPreferences.setSelectedCity(selectedCityLabel)
                             userPreferences.setSelectedRadius(radius.toFloat())
                             userPreferences.setSelectedGenres(selectedGenres)
                             userPreferences.setSelectedArtists(selectedArtists)
-                            
-                            onComplete()
+
+                            onboardingViewModel.completeOnboarding(
+                                cityId = selectedCityId,
+                                radius = radius,
+                                seedIds = selectedArtists.toList(),
+                                onSuccess = {
+                                    isCompletingOnboarding = false
+                                    onComplete()
+                                }
+                            )
                         },
-                        enabled = isNextEnabled && !isCompletingOnboarding
+                        enabled = isNextEnabled && !isCompletingOnboarding && !onboardingUiState.isCompleting
                     ) {
-                        if (isCompletingOnboarding) {
+                        if (isCompletingOnboarding || onboardingUiState.isCompleting) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 color = Color(0xFF4A90E2),
@@ -156,28 +179,38 @@ fun OnboardingScreen(
         ) {
             when (currentStep) {
                 0 -> CitySearchContent(
-                    selectedCity = selectedCity,
-                    onCitySelected = { city ->
-                        selectedCity = city
+                    selectedCityId = selectedCityId,
+                    onboardingUiState = onboardingUiState,
+                    onSearchTextChanged = { q -> onboardingViewModel.searchCities(q) },
+                    onCitySelected = { cityId, cityLabel ->
+                        selectedCityId = cityId
+                        selectedCityLabel = cityLabel
                         // Auto-advance to next step when city is selected
                         currentStep++
                     }
                 )
                 1 -> RadiusSelectionContent(
-                    selectedCity = selectedCity,
+                    selectedCity = selectedCityLabel,
                     radius = radius,
                     onRadiusChanged = { newRadius ->
                         radius = newRadius
                     }
                 )
                 2 -> GenreSelectionContent(
-                    selectedGenres = selectedGenres,
-                    onGenresChanged = { genres ->
-                        selectedGenres = genres
+                    selectedGenreIds = selectedGenreIds,
+                    curatedGenres = onboardingUiState.curatedGenres,
+                    isLoading = onboardingUiState.isLoadingGenres,
+                    onLoadGenres = { onboardingViewModel.loadCuratedGenres() },
+                    onGenresChanged = { genreIds, genreNames ->
+                        selectedGenreIds = genreIds
+                        selectedGenres = genreNames
+                        onboardingViewModel.loadPopularArtistsForGenres(selectedGenreIds)
                     }
                 )
                 3 -> ArtistSelectionContent(
                     selectedArtists = selectedArtists,
+                    popularArtists = onboardingUiState.popularArtists,
+                    isLoading = onboardingUiState.isLoadingArtists,
                     onArtistsChanged = { artists ->
                         selectedArtists = artists
                     }
@@ -185,7 +218,7 @@ fun OnboardingScreen(
             }
             
             // Loading overlay
-            if (isCompletingOnboarding) {
+            if (isCompletingOnboarding || onboardingUiState.isCompleting) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -258,46 +291,21 @@ fun OnboardingScreen(
 
 @Composable
 private fun CitySearchContent(
-    selectedCity: String,
-    onCitySelected: (String) -> Unit
+    selectedCityId: String,
+    onboardingUiState: OnboardingUiState,
+    onSearchTextChanged: (String) -> Unit,
+    onCitySelected: (cityId: String, cityLabel: String) -> Unit
 ) {
     var searchText by remember { mutableStateOf("") }
-    
-    // Mock city data that would normally come from an API
-    val allCities = listOf(
-        "Ithan, PA",
-        "Ithaca, NY", 
-        "Ithaca, MI",
-        "Ithaca, NE",
-        "Smith, NV",
-        "Faith, NC",
-        "Faith, SD",
-        "Erith, GB",
-        "Edith, OK",
-        "East Ithaca, NY",
-        "Munith, MI",
-        "St. Vith, BE",
-        "Nesmith, SC",
-        "Minnith, MO",
-        "Denith, CR"
-    )
-    
-    // Filter cities based on search text
-    val filteredCities = remember(searchText) {
-        if (searchText.length >= 2) {
-            allCities.filter { city ->
-                city.lowercase().contains(searchText.lowercase())
-            }
-        } else {
-            emptyList()
-        }
-    }
-    
+
     CitySearchScreen(
         searchText = searchText,
-        onSearchTextChanged = { searchText = it },
-        filteredCities = filteredCities,
-        selectedCity = selectedCity,
+        onSearchTextChanged = {
+            searchText = it
+            onSearchTextChanged(it)
+        },
+        filteredCities = onboardingUiState.cityResults,
+        selectedCityId = selectedCityId,
         onCitySelected = onCitySelected
     )
 }
@@ -317,22 +325,49 @@ private fun RadiusSelectionContent(
 
 @Composable
 private fun GenreSelectionContent(
-    selectedGenres: Set<String>,
-    onGenresChanged: (Set<String>) -> Unit
+    selectedGenreIds: Set<String>,
+    curatedGenres: List<com.localify.android.data.network.GenreV1Response>,
+    isLoading: Boolean,
+    onLoadGenres: () -> Unit,
+    onGenresChanged: (Set<String>, Set<String>) -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        onLoadGenres()
+    }
+
+    if (isLoading && curatedGenres.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color(0xFFE91E63))
+        }
+        return
+    }
+
     GenreSelectionScreen(
-        selectedGenres = selectedGenres,
-        onGenresChanged = onGenresChanged
+        selectedGenreIds = selectedGenreIds,
+        genres = curatedGenres,
+        onGenresChanged = { ids, names ->
+            onGenresChanged(ids, names)
+        }
     )
 }
 
 @Composable
 private fun ArtistSelectionContent(
     selectedArtists: Set<String>,
+    popularArtists: List<com.localify.android.data.network.ArtistV1Response>,
+    isLoading: Boolean,
     onArtistsChanged: (Set<String>) -> Unit
 ) {
+    if (isLoading && popularArtists.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color(0xFFE91E63))
+        }
+        return
+    }
+
     ArtistSelectionScreen(
         selectedArtists = selectedArtists,
+        artists = popularArtists,
         onArtistsChanged = onArtistsChanged
     )
 }

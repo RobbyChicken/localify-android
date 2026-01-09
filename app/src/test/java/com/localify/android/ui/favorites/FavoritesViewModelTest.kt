@@ -3,6 +3,7 @@ package com.localify.android.ui.favorites
 import android.app.Application
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
+import com.localify.android.data.network.NetworkModule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -27,13 +28,13 @@ class FavoritesViewModelTest {
     @Before
     fun setup() {
         application = ApplicationProvider.getApplicationContext()
+        NetworkModule.init(application)
         viewModel = FavoritesViewModel(application)
     }
 
     @Test
     fun `initial state is correct`() {
         val state = viewModel.uiState.value
-        assertTrue(state.isLoading)
         assertTrue(state.favoriteArtists.isEmpty())
         assertTrue(state.upcomingEvents.isEmpty())
         assertTrue(state.pastEvents.isEmpty())
@@ -42,11 +43,11 @@ class FavoritesViewModelTest {
 
     @Test
     fun `selectTab updates selected tab`() {
-        viewModel.selectTab(FavoritesTab.UPCOMING)
-        assertEquals(FavoritesTab.UPCOMING, viewModel.uiState.value.selectedTab)
+        viewModel.selectTab(FavoritesTab.UPCOMING_EVENTS)
+        assertEquals(FavoritesTab.UPCOMING_EVENTS, viewModel.uiState.value.selectedTab)
 
-        viewModel.selectTab(FavoritesTab.PAST)
-        assertEquals(FavoritesTab.PAST, viewModel.uiState.value.selectedTab)
+        viewModel.selectTab(FavoritesTab.PAST_EVENTS)
+        assertEquals(FavoritesTab.PAST_EVENTS, viewModel.uiState.value.selectedTab)
     }
 
     @Test

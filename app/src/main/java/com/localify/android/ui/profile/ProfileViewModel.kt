@@ -1,14 +1,23 @@
 package com.localify.android.ui.profile
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.localify.android.data.network.NetworkModule
+import com.localify.android.data.network.PatchUserDetailsRequest
+import com.localify.android.data.network.UserDetailsV1Response
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.localify.android.data.local.UserPreferences
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class ProfileUiState(
     val userName: String = "Localify Guest",
@@ -20,14 +29,43 @@ data class ProfileUiState(
     val isSpotifyConnected: Boolean = false,
     val emailOptIn: Boolean = false,
     val generateSpotifyPlaylists: Boolean = false,
-    val playlistsIncludeLocalOnly: Boolean = false
+    val playlistsIncludeLocalOnly: Boolean = false,
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
 class ProfileViewModel : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
-    
+
+    private val apiService = NetworkModule.apiService
+
+    init {
+        loadProfile()
+    }
+
+    fun loadProfile() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val response = apiService.getMe()
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    throw Exception("Failed to load profile (${response.code()}) - $errorBody")
+                }
+                val body = response.body() ?: throw Exception("Missing profile response")
+                val preservedLocalOnly = _uiState.value.playlistsIncludeLocalOnly
+                _uiState.value = body.toUiState(preservedLocalOnly).copy(isLoading = false)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to load profile"
+                )
+            }
+        }
+    }
+
     fun connectEmail(context: Context) {
         // Open email client for connecting email
         val intent = Intent(Intent.ACTION_SENDTO).apply {
@@ -35,6 +73,7 @@ class ProfileViewModel : ViewModel() {
             putExtra(Intent.EXTRA_SUBJECT, "Connect Email to Localify")
             putExtra(Intent.EXTRA_TEXT, "I would like to connect my email to Localify.")
         }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (intent.resolveActivity(context.packageManager) != null) {
             context.startActivity(intent)
             _uiState.value = _uiState.value.copy(
@@ -45,12 +84,15 @@ class ProfileViewModel : ViewModel() {
             Toast.makeText(context, "No email app found", Toast.LENGTH_SHORT).show()
         }
     }
-    
+
     fun connectSpotify(context: Context) {
         // Open Spotify app or web page
         val spotifyIntent = Intent(Intent.ACTION_VIEW, Uri.parse("spotify://"))
         val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://open.spotify.com/"))
-        
+
+        spotifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
         if (spotifyIntent.resolveActivity(context.packageManager) != null) {
             context.startActivity(spotifyIntent)
         } else {
@@ -59,25 +101,55 @@ class ProfileViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(isSpotifyConnected = true)
         Toast.makeText(context, "Redirecting to Spotify...", Toast.LENGTH_SHORT).show()
     }
-    
-    fun toggleEmailOptIn(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(emailOptIn = enabled)
+
+    fun setEmailOptIn(enabled: Boolean) {
+        val previous = _uiState.value
+        _uiState.value = previous.copy(emailOptIn = enabled, error = null)
+
+        viewModelScope.launch {
+            patchMe(
+                body = PatchUserDetailsRequest(emailOptIn = enabled),
+                onFailure = { msg ->
+                    _uiState.value = previous.copy(error = msg)
+                }
+            )
+        }
     }
-    
-    fun toggleSpotifyPlaylists(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(generateSpotifyPlaylists = enabled)
+
+    fun setGenerateSpotifyPlaylists(enabled: Boolean) {
+        val previous = _uiState.value
+        _uiState.value = previous.copy(generateSpotifyPlaylists = enabled, error = null)
+
+        viewModelScope.launch {
+            patchMe(
+                body = PatchUserDetailsRequest(generateSpotifyPlaylists = enabled),
+                onFailure = { msg ->
+                    _uiState.value = previous.copy(error = msg)
+                }
+            )
+        }
     }
-    
-    fun togglePlaylistsIncludeLocal(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(playlistsIncludeLocalOnly = enabled)
+
+    fun setPlaylistsIncludeLocalOnly(enabled: Boolean) {
+        val previous = _uiState.value
+        _uiState.value = previous.copy(playlistsIncludeLocalOnly = enabled, error = null)
+
+        viewModelScope.launch {
+            patchMe(
+                body = PatchUserDetailsRequest(playlistsIncludeLocalOnly = enabled),
+                onFailure = { msg ->
+                    _uiState.value = previous.copy(error = msg)
+                }
+            )
+        }
     }
-    
+
     fun logout(context: Context) {
         // Clear user preferences to reset onboarding state
         val userPreferences = UserPreferences(context)
-        userPreferences.setLoggedIn(false)
-        userPreferences.setOnboardingCompleted(false)
-        
+        NetworkModule.clearAuth()
+        userPreferences.clearAllData()
+
         _uiState.value = _uiState.value.copy(
             isLoggedIn = false,
             isEmailConnected = false,
@@ -91,12 +163,71 @@ class ProfileViewModel : ViewModel() {
         )
         Toast.makeText(context, "Logged out successfully", Toast.LENGTH_SHORT).show()
     }
-    
+
     fun deleteAccount(context: Context, onNavigateToLogin: () -> Unit) {
-        // Show confirmation and delete account
-        _uiState.value = ProfileUiState() // Reset to default state
-        Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_LONG).show()
-        // Navigate back to login screen
-        onNavigateToLogin()
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val response = apiService.deleteMe()
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    throw Exception("Failed to delete account (${response.code()}) - $errorBody")
+                }
+
+                NetworkModule.clearAuth()
+                UserPreferences(context).clearAllData()
+                _uiState.value = ProfileUiState()
+                Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_LONG).show()
+                onNavigateToLogin()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to delete account"
+                )
+            }
+        }
+    }
+
+    private suspend fun patchMe(
+        body: PatchUserDetailsRequest,
+        onFailure: (String) -> Unit
+    ) {
+        try {
+            val response = apiService.patchMe(body)
+            if (!response.isSuccessful) {
+                val errorBody = response.errorBody()?.string()
+                onFailure("Failed to update profile (${response.code()}) - $errorBody")
+                return
+            }
+
+            val updated = response.body()
+            if (updated != null) {
+                val preservedLocalOnly = _uiState.value.playlistsIncludeLocalOnly
+                _uiState.value = updated.toUiState(preservedLocalOnly).copy(error = null)
+            }
+        } catch (e: Exception) {
+            onFailure(e.message ?: "Failed to update profile")
+        }
+    }
+
+    private fun UserDetailsV1Response.toUiState(
+        preservedPlaylistsIncludeLocalOnly: Boolean
+    ): ProfileUiState {
+        val createdAtMs = if (accountCreationDate < 1_000_000_000_000L) accountCreationDate * 1000L else accountCreationDate
+        val memberSince = SimpleDateFormat("MMMM dd, yyyy", Locale.US).format(Date(createdAtMs))
+        val profileImage = profileImage ?: spotifyProfileImage ?: ""
+
+        return ProfileUiState(
+            userName = name,
+            email = email.orEmpty(),
+            profileImageUrl = profileImage,
+            memberSince = memberSince,
+            isLoggedIn = !anonymousUser,
+            isEmailConnected = emailConnected,
+            isSpotifyConnected = spotifyConnected,
+            emailOptIn = emailOptIn,
+            generateSpotifyPlaylists = playlistGeneration,
+            playlistsIncludeLocalOnly = preservedPlaylistsIncludeLocalOnly
+        )
     }
 }

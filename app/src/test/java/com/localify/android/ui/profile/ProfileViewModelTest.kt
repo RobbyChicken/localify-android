@@ -2,6 +2,7 @@ package com.localify.android.ui.profile
 
 import android.content.Context
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -9,13 +10,14 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
+@RunWith(RobolectricTestRunner::class)
 class ProfileViewModelTest {
 
     @get:Rule
@@ -23,14 +25,13 @@ class ProfileViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
 
-    @Mock
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     private lateinit var viewModel: ProfileViewModel
 
     @Before
     fun setup() {
-        MockitoAnnotations.openMocks(this)
+        context = ApplicationProvider.getApplicationContext()
         Dispatchers.setMain(testDispatcher)
         viewModel = ProfileViewModel()
     }
@@ -103,7 +104,7 @@ class ProfileViewModelTest {
     @Test
     fun `connectSpotify updates isSpotifyConnected state`() {
         // When
-        viewModel.connectSpotify(mockContext)
+        viewModel.connectSpotify(context)
 
         // Then
         assertTrue(viewModel.uiState.value.isSpotifyConnected)

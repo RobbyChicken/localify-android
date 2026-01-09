@@ -16,14 +16,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.localify.android.data.network.CityResponse
 
 @Composable
 fun CitySearchScreen(
     searchText: String,
     onSearchTextChanged: (String) -> Unit,
-    filteredCities: List<String>,
-    selectedCity: String,
-    onCitySelected: (String) -> Unit
+    filteredCities: List<CityResponse>,
+    selectedCityId: String,
+    onCitySelected: (cityId: String, cityLabel: String) -> Unit
 ) {
     
     Column(
@@ -79,11 +80,18 @@ fun CitySearchScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(filteredCities) { city ->
+                    val label = buildString {
+                        append(city.name)
+                        if (!city.state.isNullOrBlank()) {
+                            append(", ")
+                            append(city.state)
+                        }
+                    }
                     CityItem(
-                        city = city,
-                        isSelected = selectedCity == city,
+                        city = label,
+                        isSelected = selectedCityId == city.id,
                         onClick = {
-                            onCitySelected(city)
+                            onCitySelected(city.id, label)
                         }
                     )
                 }

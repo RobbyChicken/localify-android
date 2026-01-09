@@ -36,12 +36,14 @@ import com.localify.android.data.local.UserPreferences
 fun ArtistCard(
     artist: Artist,
     onArtistClick: () -> Unit,
+    isFavoriteOverride: Boolean? = null,
+    onFavoriteClick: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context) }
     val favoriteArtists by userPreferences.favoriteArtists.collectAsState()
-    val isFavorite = favoriteArtists.contains(artist.id)
+    val isFavorite = isFavoriteOverride ?: favoriteArtists.contains(artist.id)
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -82,10 +84,14 @@ fun ArtistCard(
             // Top right - Heart icon
             IconButton(
                 onClick = { 
-                    if (isFavorite) {
-                        userPreferences.removeFavoriteArtist(artist.id)
+                    if (onFavoriteClick != null) {
+                        onFavoriteClick(!isFavorite)
                     } else {
-                        userPreferences.addFavoriteArtist(artist.id)
+                        if (isFavorite) {
+                            userPreferences.removeFavoriteArtist(artist.id)
+                        } else {
+                            userPreferences.addFavoriteArtist(artist.id)
+                        }
                     }
                 },
                 modifier = Modifier

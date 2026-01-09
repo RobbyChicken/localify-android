@@ -161,7 +161,10 @@ fun SearchScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-                uiState.searchResults.artists.isEmpty() && uiState.searchResults.events.isEmpty() -> {
+                uiState.searchResults.artists.isEmpty() &&
+                    uiState.searchResults.events.isEmpty() &&
+                    uiState.searchResults.venues.isEmpty() &&
+                    uiState.searchResults.cities.isEmpty() -> {
                     NoResultsState(
                         modifier = Modifier.fillMaxSize()
                     )
@@ -208,8 +211,79 @@ fun SearchScreen(
                                 )
                             }
                         }
+
+                        // Venues section
+                        if (uiState.searchResults.venues.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Venues",
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                                )
+                            }
+                            items(uiState.searchResults.venues) { venue ->
+                                SimpleResultRow(
+                                    title = venue.name,
+                                    subtitle = "${venue.city.name}, ${venue.city.state}".trimEnd(',', ' ')
+                                )
+                            }
+                        }
+
+                        // Cities section
+                        if (uiState.searchResults.cities.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Cities",
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                                )
+                            }
+                            items(uiState.searchResults.cities) { city ->
+                                val subtitle = listOf(city.state, city.country)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(", ")
+                                SimpleResultRow(
+                                    title = city.name,
+                                    subtitle = subtitle
+                                )
+                            }
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SimpleResultRow(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
             }
         }
     }

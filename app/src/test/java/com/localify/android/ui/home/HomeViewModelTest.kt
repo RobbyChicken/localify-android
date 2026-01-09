@@ -1,24 +1,34 @@
 package com.localify.android.ui.home
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.test.core.app.ApplicationProvider
+import com.localify.android.data.network.AuthResponse
 import com.localify.android.data.network.EventRecResponse
 import com.localify.android.data.network.ArtistRecResponse
+import com.localify.android.data.network.NetworkModule
+import com.localify.android.data.network.UserCity
+import com.localify.android.data.network.UserCityResponse
 import com.localify.android.data.repository.HomeRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
+import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
+@RunWith(RobolectricTestRunner::class)
 class HomeViewModelTest {
 
     @get:Rule
@@ -26,15 +36,33 @@ class HomeViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
 
-    @Mock
     private lateinit var mockRepository: HomeRepository
 
     private lateinit var viewModel: HomeViewModel
 
     @Before
     fun setup() {
-        MockitoAnnotations.openMocks(this)
         Dispatchers.setMain(testDispatcher)
+
+        mockRepository = mock()
+
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        NetworkModule.init(context)
+
+        // Avoid hitting real network/auth setup during init.
+        NetworkModule.storeAuth(AuthResponse(token = "test", refreshToken = "test", expiresIn = 3600))
+
+        runBlocking {
+            whenever(mockRepository.getUserCities()).thenReturn(
+                UserCityResponse(
+                    current = UserCity(id = "city1", name = "Ithaca, NY", radius = 50.0, selected = true),
+                    others = emptyList()
+                )
+            )
+            whenever(mockRepository.getArtistRecommendations(any(), any())).thenReturn(emptyList())
+            whenever(mockRepository.getEventRecommendations(any(), any())).thenReturn(emptyList())
+        }
+
         viewModel = HomeViewModel(mockRepository)
     }
 
@@ -61,7 +89,7 @@ class HomeViewModelTest {
         )
         
         // Update the UI state with mock events
-        viewModel.uiState.value.copy(allEvents = mockEvents, events = mockEvents)
+        setUiState(viewModel.uiState.value.copy(allEvents = mockEvents, events = mockEvents))
 
         // When
         viewModel.applyDateFilter("One week")
@@ -69,6 +97,14 @@ class HomeViewModelTest {
         // Then
         assertEquals("One week", viewModel.uiState.value.selectedTimeFrame)
         assertTrue(viewModel.uiState.value.events.isNotEmpty())
+    }
+
+    private fun setUiState(state: HomeUiState) {
+        val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val flow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+        flow.value = state
     }
 
     @Test
@@ -85,7 +121,6 @@ class HomeViewModelTest {
         return EventRecResponse(
             id = id,
             name = "Test Event",
-            description = "Test Description",
             percentMatch = 0.85,
             startTime = startTime,
             venue = createMockVenue(),

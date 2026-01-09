@@ -162,6 +162,10 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToEventDetail = { eventId ->
                                     selectedEventId = eventId
                                     currentScreen = Screen.EVENT_DETAIL
+                                },
+                                onNavigateToArtistDetail = { artistId ->
+                                    selectedArtistId = artistId
+                                    currentScreen = Screen.ARTIST_DETAIL
                                 }
                             )
                         }

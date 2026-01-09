@@ -81,6 +81,16 @@ object NetworkModule {
         tokenStore.storeAuth(auth)
     }
 
+    fun hasValidAuth(): Boolean {
+        ensureInitialized()
+        return tokenStore.isTokenValid() && !tokenStore.getAccessToken().isNullOrBlank()
+    }
+
+    fun getAccessToken(): String? {
+        ensureInitialized()
+        return tokenStore.getAccessToken()
+    }
+
     fun clearAuth() {
         ensureInitialized()
         tokenStore.clear()

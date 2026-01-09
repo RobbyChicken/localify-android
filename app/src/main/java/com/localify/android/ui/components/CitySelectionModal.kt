@@ -3,6 +3,8 @@ package com.localify.android.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.localify.android.data.network.CityResponse
 import com.localify.android.data.network.NetworkModule
+import com.localify.android.data.network.UserCity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -38,7 +41,52 @@ fun CitySelectionModal(
     var suggestedCities by remember { mutableStateOf<List<CityResponse>>(emptyList()) }
     var isLoadingSuggestions by remember { mutableStateOf(false) }
     var suggestionError by remember { mutableStateOf<String?>(null) }
+    var userCities by remember { mutableStateOf<List<UserCityRow>>(emptyList()) }
+    var currentUserCityId by remember { mutableStateOf<String?>(null) }
+    var isLoadingUserCities by remember { mutableStateOf(false) }
+    var userCitiesError by remember { mutableStateOf<String?>(null) }
+    var refreshUserCitiesKey by remember { mutableStateOf(0) }
     val apiService = remember { NetworkModule.apiService }
+
+    val selectedRow = remember(userCities, currentUserCityId) {
+        userCities.firstOrNull { it.id == currentUserCityId }
+    }
+
+    LaunchedEffect(currentRadius) {
+        radius = currentRadius
+    }
+
+    LaunchedEffect(selectedRow?.id, selectedRow?.radiusMiles) {
+        val r = selectedRow?.radiusMiles
+        if (r != null) radius = r
+    }
+
+    LaunchedEffect(isVisible, refreshUserCitiesKey) {
+        if (!isVisible) return@LaunchedEffect
+        isLoadingUserCities = true
+        userCitiesError = null
+        try {
+            val response = withContext(Dispatchers.IO) { apiService.getUserCities() }
+            if (response.isSuccessful) {
+                val body = response.body()
+                val current = body?.current
+                val others = body?.others.orEmpty()
+                currentUserCityId = current?.id
+
+                val rows = buildList {
+                    if (current != null) add(current.toRow())
+                    others.forEach { add(it.toRow()) }
+                }
+                userCities = rows
+            } else {
+                userCitiesError = "Failed to load your cities (${response.code()})"
+            }
+        } catch (e: Exception) {
+            userCitiesError = e.message ?: "Failed to load your cities"
+        } finally {
+            isLoadingUserCities = false
+        }
+    }
 
     LaunchedEffect(showCitySearch) {
         if (!showCitySearch) return@LaunchedEffect
@@ -53,10 +101,13 @@ fun CitySelectionModal(
             if (response.isSuccessful) {
                 val cities = response.body()?.cities.orEmpty()
                 suggestedCities = cities.map {
+                    val parts = it.name.split(",")
+                    val cityName = parts.firstOrNull()?.trim().orEmpty().ifBlank { it.name }
+                    val state = parts.getOrNull(1)?.trim()
                     CityResponse(
                         id = it.id,
-                        name = it.name,
-                        state = null,
+                        name = cityName,
+                        state = state,
                         country = it.countryCode ?: "",
                         latitude = it.latitude,
                         longitude = it.longitude
@@ -153,7 +204,7 @@ fun CitySelectionModal(
                     ) {
                         Column {
                             Text(
-                                text = currentCity.split(",").firstOrNull()?.trim() ?: currentCity,
+                                text = selectedRow?.displayName ?: currentCity,
                                 color = Color.White,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
@@ -214,6 +265,84 @@ fun CitySelectionModal(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Your Cities",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when {
+                    isLoadingUserCities -> {
+                        CircularProgressIndicator(color = Color(0xFFE91E63))
+                    }
+                    userCitiesError != null -> {
+                        Text(
+                            text = userCitiesError ?: "",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
+                    userCities.isEmpty() -> {
+                        Text(
+                            text = "No saved cities yet.",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 240.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(userCities) { row ->
+                                val isCurrent = row.id == currentUserCityId
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            radius = row.radiusMiles
+                                            onCitySelected(
+                                                CityResponse(
+                                                    id = row.id,
+                                                    name = row.cityName,
+                                                    state = row.state,
+                                                    country = "",
+                                                    latitude = 0.0,
+                                                    longitude = 0.0
+                                                ),
+                                                row.radiusMiles
+                                            )
+                                            refreshUserCitiesKey++
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isCurrent) Color(0xFF2A2A2A) else Color(0xFF333333)
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text(
+                                            text = row.displayName,
+                                            color = Color.White,
+                                            fontSize = 16.sp,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Radius: ${row.radiusMiles} miles",
+                                            color = Color.White.copy(alpha = 0.7f),
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -320,7 +449,7 @@ fun CitySelectionModal(
                         }
                         else -> {
                             suggestedCities.take(20).forEach { city ->
-                                val cityLabel = city.name
+                                val cityLabel = listOfNotNull(city.name, city.state).joinToString(", ")
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -329,6 +458,7 @@ fun CitySelectionModal(
                                             onCitySelected(city, radius)
                                             showCitySearch = false
                                             searchQuery = ""
+                                            refreshUserCitiesKey++
                                         },
                                     colors = CardDefaults.cardColors(
                                         containerColor = Color(0xFF333333)
@@ -371,6 +501,7 @@ fun CitySelectionModal(
                                     onCitySelected(city, radius)
                                     showCitySearch = false
                                     searchQuery = "" // Reset search
+                                    refreshUserCitiesKey++
                                 },
                             colors = CardDefaults.cardColors(
                                 containerColor = Color(0xFF333333)
@@ -388,4 +519,26 @@ fun CitySelectionModal(
             }
         }
     }
+}
+
+private data class UserCityRow(
+    val id: String,
+    val cityName: String,
+    val state: String?,
+    val displayName: String,
+    val radiusMiles: Int
+)
+
+private fun UserCity.toRow(): UserCityRow {
+    val parts = name.split(",")
+    val cityName = parts.firstOrNull()?.trim().orEmpty().ifBlank { name }
+    val state = parts.getOrNull(1)?.trim()
+    val displayName = listOfNotNull(cityName, state).joinToString(", ")
+    return UserCityRow(
+        id = id,
+        cityName = cityName,
+        state = state,
+        displayName = displayName,
+        radiusMiles = radius.toInt()
+    )
 }

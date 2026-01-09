@@ -27,18 +27,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.WindowInsets
@@ -49,6 +49,9 @@ import com.localify.android.ui.components.EventCard
 import com.localify.android.ui.components.ArtistCard
 import com.localify.android.ui.components.CitySelectionModal
 import com.localify.android.data.local.UserPreferences
+import com.localify.android.data.network.NetworkModule
+import kotlinx.coroutines.launch
+import retrofit2.Response
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +69,25 @@ fun HomeScreen(
     
     // UI state
     val uiState by viewModel.uiState.collectAsState()
+
+    val apiService = remember { NetworkModule.apiService }
+    val coroutineScope = rememberCoroutineScope()
+
+    suspend fun <T> callWithGuestAuthRetry(block: suspend () -> Response<T>): Response<T> {
+        val initial = block()
+        if (initial.code() != 401) return initial
+
+        val guest = apiService.createGuestUser()
+        if (guest.isSuccessful) {
+            val auth = guest.body()
+            if (auth != null) {
+                NetworkModule.storeAuth(auth)
+                return block()
+            }
+        }
+
+        return initial
+    }
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context) }
     
@@ -371,10 +393,30 @@ fun HomeScreen(
                                         com.localify.android.ui.components.EventRecCard(
                                             event = event,
                                             onFavoriteClick = {
-                                                if (favoriteEvents.contains(event.id)) {
-                                                    userPreferences.removeFavoriteEvent(event.id)
-                                                } else {
-                                                    userPreferences.addFavoriteEvent(event.id)
+                                                val currentlyFavorite = favoriteEvents.contains(event.id)
+                                                val shouldBeFavorite = !currentlyFavorite
+                                                coroutineScope.launch {
+                                                    try {
+                                                        if (shouldBeFavorite) {
+                                                            userPreferences.addFavoriteEvent(event.id)
+                                                            val resp = callWithGuestAuthRetry {
+                                                                apiService.addFavorite(type = "events", id = event.id)
+                                                            }
+                                                            if (!resp.isSuccessful) throw Exception("Failed to add favorite event (${resp.code()})")
+                                                        } else {
+                                                            userPreferences.removeFavoriteEvent(event.id)
+                                                            val resp = callWithGuestAuthRetry {
+                                                                apiService.removeFavorite(type = "events", id = event.id)
+                                                            }
+                                                            if (!resp.isSuccessful) throw Exception("Failed to remove favorite event (${resp.code()})")
+                                                        }
+                                                    } catch (_: Exception) {
+                                                        if (currentlyFavorite) {
+                                                            userPreferences.addFavoriteEvent(event.id)
+                                                        } else {
+                                                            userPreferences.removeFavoriteEvent(event.id)
+                                                        }
+                                                    }
                                                 }
                                             },
                                             isFavorited = favoriteEvents.contains(event.id),
@@ -447,10 +489,30 @@ fun HomeScreen(
                                         com.localify.android.ui.components.ArtistRecCard(
                                             artist = artist,
                                             onFavoriteClick = {
-                                                if (favoriteArtists.contains(artist.id)) {
-                                                    userPreferences.removeFavoriteArtist(artist.id)
-                                                } else {
-                                                    userPreferences.addFavoriteArtist(artist.id)
+                                                val currentlyFavorite = favoriteArtists.contains(artist.id)
+                                                val shouldBeFavorite = !currentlyFavorite
+                                                coroutineScope.launch {
+                                                    try {
+                                                        if (shouldBeFavorite) {
+                                                            userPreferences.addFavoriteArtist(artist.id)
+                                                            val resp = callWithGuestAuthRetry {
+                                                                apiService.addFavorite(type = "artists", id = artist.id)
+                                                            }
+                                                            if (!resp.isSuccessful) throw Exception("Failed to add favorite artist (${resp.code()})")
+                                                        } else {
+                                                            userPreferences.removeFavoriteArtist(artist.id)
+                                                            val resp = callWithGuestAuthRetry {
+                                                                apiService.removeFavorite(type = "artists", id = artist.id)
+                                                            }
+                                                            if (!resp.isSuccessful) throw Exception("Failed to remove favorite artist (${resp.code()})")
+                                                        }
+                                                    } catch (_: Exception) {
+                                                        if (currentlyFavorite) {
+                                                            userPreferences.addFavoriteArtist(artist.id)
+                                                        } else {
+                                                            userPreferences.removeFavoriteArtist(artist.id)
+                                                        }
+                                                    }
                                                 }
                                             },
                                             isFavorited = favoriteArtists.contains(artist.id),
@@ -482,7 +544,6 @@ fun HomeScreen(
             onDismiss = { showCityModal = false },
             onCitySelected = { city, radiusMiles ->
                 viewModel.changeCity(cityId = city.id, radiusMiles = radiusMiles.toDouble())
-                showCityModal = false
             }
         )
     }

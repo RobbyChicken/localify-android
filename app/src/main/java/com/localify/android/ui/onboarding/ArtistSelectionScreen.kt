@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.localify.android.data.network.ArtistV1Response
 
 data class SelectableArtist(
     val id: String,
@@ -31,28 +32,21 @@ data class SelectableArtist(
 @Composable
 fun ArtistSelectionScreen(
     selectedArtists: Set<String>,
+    artists: List<ArtistV1Response>,
     onArtistsChanged: (Set<String>) -> Unit
 ) {
-    val artists = listOf(
-        SelectableArtist("1", "Ray Charles", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("2", "Weezer", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("3", "Johnny Cash", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("4", "The Killers", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("5", "Slightly Stoopid", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("6", "Luke Combs", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("7", "Bruce Springsteen", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("8", "Taylor Swift", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("9", "Ed Sheeran", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("10", "Billie Eilish", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("11", "Drake", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("12", "Ariana Grande", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("13", "Post Malone", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f"),
-        SelectableArtist("14", "Dua Lipa", "https://images.unsplash.com/photo-1516280440614-37939bbacd81"),
-        SelectableArtist("15", "The Weeknd", "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f")
-    )
-    
     var searchText by remember { mutableStateOf("") }
     var showSearch by remember { mutableStateOf(false) }
+
+    val selectableArtists = remember(artists) {
+        artists.map {
+            SelectableArtist(
+                id = it.id,
+                name = it.name,
+                imageUrl = it.image ?: ""
+            )
+        }
+    }
     
     Column(
         modifier = Modifier
@@ -110,9 +104,9 @@ fun ArtistSelectionScreen(
             modifier = Modifier.weight(1f)
         ) {
             val filteredArtists = if (searchText.length >= 2) {
-                artists.filter { it.name.contains(searchText, ignoreCase = true) }
+                selectableArtists.filter { it.name.contains(searchText, ignoreCase = true) }
             } else {
-                artists
+                selectableArtists
             }
             
             items(filteredArtists) { artist ->

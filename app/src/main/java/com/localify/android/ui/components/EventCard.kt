@@ -35,12 +35,14 @@ fun EventCard(
     event: Event,
     onEventClick: () -> Unit,
     onArtistClick: () -> Unit,
+    isBookmarkedOverride: Boolean? = null,
+    onBookmarkClick: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context) }
     val favoriteEvents by userPreferences.favoriteEvents.collectAsState()
-    val isBookmarked = favoriteEvents.contains(event.id)
+    val isBookmarked = isBookmarkedOverride ?: favoriteEvents.contains(event.id)
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -115,10 +117,14 @@ fun EventCard(
             // Top right - Bookmark icon
             IconButton(
                 onClick = { 
-                    if (isBookmarked) {
-                        userPreferences.removeFavoriteEvent(event.id)
+                    if (onBookmarkClick != null) {
+                        onBookmarkClick(!isBookmarked)
                     } else {
-                        userPreferences.addFavoriteEvent(event.id)
+                        if (isBookmarked) {
+                            userPreferences.removeFavoriteEvent(event.id)
+                        } else {
+                            userPreferences.addFavoriteEvent(event.id)
+                        }
                     }
                 },
                 modifier = Modifier

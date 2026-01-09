@@ -41,9 +41,15 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { snackbarHostState.showSnackbar(it) }
+    }
     
     Scaffold(
         containerColor = Color.Black,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             NavigationBar(
                 containerColor = Color.Black,
@@ -135,6 +141,14 @@ fun ProfileScreen(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    if (uiState.isLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            color = Color(0xFFE91E63)
+                        )
+                    }
                     // Profile Avatar
                     Box(
                         modifier = Modifier
@@ -238,7 +252,7 @@ fun ProfileScreen(
                     title = "Receive Personalized Weekly Emails",
                     subtitle = "Subscribe to receive weekly emails about upcoming events curated to your cities and discovered artists.",
                     isChecked = uiState.emailOptIn,
-                    onToggle = { viewModel.toggleEmailOptIn(it) }
+                    onToggle = { viewModel.setEmailOptIn(it) }
                 )
             }
             
@@ -249,7 +263,7 @@ fun ProfileScreen(
                     title = "Generate Local Spotify Playlists",
                     subtitle = "Generate Spotify playlists using your discovered artists. You can choose to include your familiar artists.",
                     isChecked = uiState.generateSpotifyPlaylists,
-                    onToggle = { viewModel.toggleSpotifyPlaylists(it) }
+                    onToggle = { viewModel.setGenerateSpotifyPlaylists(it) }
                 )
                 
                 // Nested toggle for using familiar artists (only show if playlist generation is enabled)
@@ -279,7 +293,7 @@ fun ProfileScreen(
                             
                             Switch(
                                 checked = uiState.playlistsIncludeLocalOnly,
-                                onCheckedChange = { viewModel.togglePlaylistsIncludeLocal(it) },
+                                onCheckedChange = { viewModel.setPlaylistsIncludeLocalOnly(it) },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
                                     checkedTrackColor = Color(0xFFE91E63),

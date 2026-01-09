@@ -5,8 +5,6 @@ import com.localify.android.data.models.Event
 import com.localify.android.data.network.NetworkModule
 
 class ArtistRepository {
-    private val apiService = NetworkModule.apiService
-    
     suspend fun getArtistsByIds(artistIds: List<String>): List<Artist> {
         // This is now deprecated - use HomeRepository for recommendations
         throw Exception("Use HomeRepository for artist recommendations")

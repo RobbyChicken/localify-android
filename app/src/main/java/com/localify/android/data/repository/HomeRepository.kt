@@ -9,7 +9,7 @@ import com.localify.android.data.network.AuthResponse
 import com.localify.android.data.network.ArtistRecommendationsRequest
 
 class HomeRepository {
-    private val apiService = NetworkModule.apiService
+    private val apiService by lazy { NetworkModule.apiService }
     
     suspend fun createGuestUser(): AuthResponse {
         Log.d("HomeRepository", "Creating guest user...")
@@ -37,16 +37,42 @@ class HomeRepository {
         } else if (response.code() == 409) {
             Log.d("HomeRepository", "User has no cities (409), setting up default city and seeds")
             
-            // Step 1: Add default city (New York, NY)
-            val defaultCityId = "bb5dbc41-213b-45c6-8eb3-523fcb3e85f6" // NYC UUID from staging server
-            val addCityResponse = apiService.addUserCity(
-                defaultCityId, 
+            // Step 1: Add default city (prefer Ithaca, NY)
+            val fallbackCityId = "bb5dbc41-213b-45c6-8eb3-523fcb3e85f6" // NYC UUID from staging server
+            val defaultCityId = try {
+                val search = apiService.searchCities("Ithaca", limit = 10)
+                if (search.isSuccessful) {
+                    val matches = search.body().orEmpty()
+                    val ithaca = matches.firstOrNull { (it.name.contains("Ithaca", ignoreCase = true)) && (it.state?.equals("NY", ignoreCase = true) == true) }
+                        ?: matches.firstOrNull { it.name.contains("Ithaca", ignoreCase = true) }
+                    ithaca?.id ?: fallbackCityId
+                } else {
+                    fallbackCityId
+                }
+            } catch (_: Exception) {
+                fallbackCityId
+            }
+
+            val addCityResponse = apiService.putUserCity(
+                defaultCityId,
                 com.localify.android.data.network.AddCityRequest(radius = 50.0)
             )
             if (!addCityResponse.isSuccessful) {
                 val errorBody = addCityResponse.errorBody()?.string()
                 Log.e("HomeRepository", "Failed to add default city: ${addCityResponse.code()}, body: $errorBody")
                 throw Exception("Failed to setup user city: ${addCityResponse.code()} - $errorBody")
+            }
+
+            try {
+                val select = apiService.patchUserCity(
+                    defaultCityId,
+                    com.localify.android.data.network.PatchUserCityRequest(selected = true, radius = 50.0)
+                )
+                if (!select.isSuccessful) {
+                    Log.w("HomeRepository", "Default city selection PATCH failed: ${select.code()}")
+                }
+            } catch (e: Exception) {
+                Log.w("HomeRepository", "Default city selection PATCH failed: ${e.message}")
             }
             
             // Step 2: Add default seeds (popular artists)

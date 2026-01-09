@@ -42,7 +42,8 @@ import com.localify.android.data.models.City
 fun ArtistDetailScreen(
     artistId: String,
     onNavigateBack: () -> Unit,
-    onNavigateToEventDetail: (String) -> Unit = {}
+    onNavigateToEventDetail: (String) -> Unit = {},
+    onNavigateToArtistDetail: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: ArtistDetailViewModel = viewModel { 
@@ -99,14 +100,12 @@ fun ArtistDetailScreen(
                 ArtistDetailContent(
                     artist = artist,
                     upcomingEvents = uiState.upcomingEvents,
+                    localCities = uiState.localCities,
+                    similarArtists = uiState.similarArtists,
                     isFavorite = uiState.isFavorite,
                     onNavigateBack = onNavigateBack,
                     onNavigateToEventDetail = onNavigateToEventDetail,
-                    onNavigateToArtistDetail = { artistId -> 
-                        // For now, just navigate to the same artist detail screen
-                        // In a real app, you'd navigate to the specific artist
-                        onNavigateBack()
-                    },
+                    onNavigateToArtistDetail = onNavigateToArtistDetail,
                     onToggleFavorite = { viewModel.toggleFavorite() }
                 )
             }
@@ -118,6 +117,8 @@ fun ArtistDetailScreen(
 private fun ArtistDetailContent(
     artist: Artist,
     upcomingEvents: List<Event>,
+    localCities: List<String>,
+    similarArtists: List<Artist>,
     isFavorite: Boolean,
     onNavigateBack: () -> Unit,
     onNavigateToEventDetail: (String) -> Unit,
@@ -287,10 +288,15 @@ private fun ArtistDetailContent(
             )
             
             Spacer(modifier = Modifier.height(16.dp))
-            
-            // Mock cities where artist performs
-            val cities = listOf("Ithaca, NY", "Holyoke, MA")
-            cities.forEach { city ->
+
+            if (localCities.isEmpty()) {
+                Text(
+                    text = "No local cities for this artist.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            } else {
+                localCities.forEach { city ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -310,6 +316,7 @@ private fun ArtistDetailContent(
                         color = Color.White
                     )
                 }
+            }
             }
         }
         
@@ -332,18 +339,11 @@ private fun ArtistDetailContent(
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(3) { index ->
-                    val artistNames = listOf("Caveman Produc...", "21st Hapilos", "RazzAttack Muzik")
-                    val artistIds = listOf("artist2", "artist3", "artist4") // Mock artist IDs
-                    val artistImages = listOf(
-                        "https://images.unsplash.com/photo-1516280440614-37939bbacd81?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-                        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-                        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
-                    )
+                items(similarArtists) { similar ->
                     SimilarArtistCard(
-                        name = artistNames[index],
-                        imageUrl = artistImages[index],
-                        onClick = { onNavigateToArtistDetail(artistIds[index]) } // Navigate to artist detail
+                        name = similar.name,
+                        imageUrl = similar.imageUrl,
+                        onClick = { onNavigateToArtistDetail(similar.id) }
                     )
                 }
             }

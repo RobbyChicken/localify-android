@@ -50,13 +50,17 @@ class HomeViewModel(
             
             try {
                 println("DEBUG: Starting app initialization...")
-                
-                // Create guest user to get auth token
-                println("DEBUG: Creating guest user...")
-                val authResponse = homeRepository.createGuestUser()
-                val authToken = authResponse.token
-                NetworkModule.storeAuth(authResponse)
-                println("DEBUG: Got auth token: ${authToken.take(20)}...")
+
+                val authToken = if (NetworkModule.hasValidAuth()) {
+                    println("DEBUG: Using existing stored auth token")
+                    NetworkModule.getAccessToken()
+                } else {
+                    println("DEBUG: Creating guest user...")
+                    val authResponse = homeRepository.createGuestUser()
+                    NetworkModule.storeAuth(authResponse)
+                    println("DEBUG: Got auth token: ${authResponse.token.take(20)}...")
+                    authResponse.token
+                }
                 
                 // Get user cities
                 println("DEBUG: Getting user cities...")
@@ -164,7 +168,7 @@ class HomeViewModel(
                     )
                     val events = homeRepository.getEventRecommendations(cityId, request)
                     println("DEBUG: Successfully loaded ${events.size} events")
-                    events
+                    events.map { it.normalizeTimestamps() }
                 } catch (e: Exception) {
                     println("ERROR: Failed to fetch events: ${e.message}")
                     e.printStackTrace()
@@ -282,6 +286,21 @@ class HomeViewModel(
     }
     
     private fun parseEventDate(startTime: Long): Long {
-        return startTime
+        return normalizeEpochMillis(startTime)
+    }
+
+    private fun normalizeEpochMillis(value: Long): Long {
+        // If backend returns epoch seconds, convert to millis.
+        return if (value in 1..999_999_999_999L) value * 1000L else value
+    }
+
+    private fun EventRecResponse.normalizeTimestamps(): EventRecResponse {
+        val normalizedStart = normalizeEpochMillis(startTime)
+        val normalizedCreatedAt = normalizeEpochMillis(createdAt)
+        return if (normalizedStart == startTime && normalizedCreatedAt == createdAt) {
+            this
+        } else {
+            copy(startTime = normalizedStart, createdAt = normalizedCreatedAt)
+        }
     }
 }

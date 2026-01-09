@@ -1,5 +1,7 @@
 package com.localify.android.ui.detail
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,10 +27,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.localify.android.data.models.Event
 import com.localify.android.data.models.Venue
@@ -42,42 +47,17 @@ fun EventDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToArtistDetail: (String) -> Unit = {}
 ) {
-    // State for bookmark functionality
-    var isBookmarked by remember { mutableStateOf(false) }
-    
-    // Mock event data to match Randy Travis mockup
-    val mockEvent = Event(
-        id = eventId,
-        name = "Randy Travis",
-        imageUrl = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
-        date = "Thursday, November 20, 2025, 7:00 PM EST",
-        venue = Venue(
-            id = "venue1",
-            name = "Broome County Forum Theatre",
-            address = "236 Washington St",
-            city = City(
-                id = "city1",
-                name = "Binghamton",
-                state = "NY",
-                country = "USA",
-                latitude = 42.0987,
-                longitude = -75.9180
-            )
-        ),
-        artists = listOf(
-            Artist(
-                id = "randy_travis",
-                name = "Randy Travis",
-                imageUrl = "https://images.unsplash.com/photo-1516280440614-37939bbacd81?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-                genres = listOf("Country", "Gospel"),
-                bio = "Randy Travis is an American country music and gospel music singer.",
-                spotifyId = "0Y5tJX1MQlPlqiwlOH1tJY",
-                popularity = 85
-            )
-        ),
-        ticketUrl = "https://example.com/tickets",
-        description = "An evening with country music legend Randy Travis."
+    val context = LocalContext.current
+    val viewModel: EventDetailViewModel = viewModel(
+        factory = ViewModelProvider.AndroidViewModelFactory.getInstance(context.applicationContext as android.app.Application)
     )
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(eventId) {
+        viewModel.loadEvent(eventId)
+    }
+
+    val event = uiState.event
 
     Column(
         modifier = Modifier
@@ -85,6 +65,47 @@ fun EventDetailScreen(
             .background(Color.Black)
             .verticalScroll(rememberScrollState())
     ) {
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFFE91E63))
+            }
+        }
+
+        uiState.error?.let { error ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Failed to load event",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = error,
+                    color = Color.Gray,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { viewModel.loadEvent(eventId) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63))
+                ) {
+                    Text("Retry", color = Color.White)
+                }
+            }
+        }
+
         // Header with Back Button and Title
         Row(
             modifier = Modifier
@@ -110,7 +131,7 @@ fun EventDetailScreen(
             Spacer(modifier = Modifier.width(16.dp))
             
             Text(
-                text = mockEvent.artists.firstOrNull()?.name ?: "Artist",
+                text = event?.artists?.firstOrNull()?.name ?: "Event",
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -128,15 +149,15 @@ fun EventDetailScreen(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 AsyncImage(
-                    model = mockEvent.imageUrl,
-                    contentDescription = "${mockEvent.name} image",
+                    model = event?.imageUrl,
+                    contentDescription = "${event?.name ?: "Event"} image",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
                 
                 // Bookmark icon
                 IconButton(
-                    onClick = { isBookmarked = !isBookmarked },
+                    onClick = { viewModel.toggleFavorite() },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
@@ -146,9 +167,9 @@ fun EventDetailScreen(
                         )
                 ) {
                     Icon(
-                        imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                        tint = if (isBookmarked) Color(0xFF007AFF) else Color.White,
+                        imageVector = if (uiState.isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = if (uiState.isFavorite) "Remove bookmark" else "Add bookmark",
+                        tint = if (uiState.isFavorite) Color(0xFF007AFF) else Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -165,7 +186,7 @@ fun EventDetailScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = mockEvent.name,
+                text = event?.name ?: "",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp
@@ -177,7 +198,7 @@ fun EventDetailScreen(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = mockEvent.venue.name,
+                text = event?.venue?.name ?: "",
                 style = MaterialTheme.typography.titleLarge,
                 color = Color(0xFF007AFF),
                 textAlign = TextAlign.Center
@@ -186,7 +207,7 @@ fun EventDetailScreen(
             Spacer(modifier = Modifier.height(4.dp))
             
             Text(
-                text = "${mockEvent.venue.city.name}, ${mockEvent.venue.city.state}",
+                text = "${event?.venue?.city?.name ?: ""}, ${event?.venue?.city?.state ?: ""}".trimEnd(',', ' '),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -195,7 +216,7 @@ fun EventDetailScreen(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = mockEvent.date,
+                text = event?.date ?: "",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -206,7 +227,15 @@ fun EventDetailScreen(
         
         // View Event Tickets Button
         Button(
-            onClick = { /* TODO: Open ticket URL */ },
+            onClick = {
+                val url = event?.ticketUrl
+                if (!url.isNullOrBlank()) {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
@@ -225,7 +254,7 @@ fun EventDetailScreen(
         }
         
         // Description Section
-        if (mockEvent.description.isNotEmpty()) {
+        if (!event?.description.isNullOrEmpty()) {
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp)
             ) {
@@ -240,7 +269,7 @@ fun EventDetailScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Text(
-                    text = mockEvent.description,
+                    text = event?.description ?: "",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.8f),
                     lineHeight = 24.sp
@@ -253,7 +282,7 @@ fun EventDetailScreen(
         Spacer(modifier = Modifier.height(32.dp))
         
         // Performing Artists Section
-        if (mockEvent.artists.isNotEmpty()) {
+        if (!event?.artists.isNullOrEmpty()) {
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp)
             ) {
@@ -271,22 +300,23 @@ fun EventDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // First artist from the event
-                    mockEvent.artists.firstOrNull()?.let { artist ->
+                    event?.artists?.firstOrNull()?.let { artist ->
                         PerformingArtistCard(
                             name = artist.name,
-                            subtitle = "Marshville, NC", // Mock subtitle
+                            subtitle = "",
                             imageUrl = artist.imageUrl,
                             onClick = { onNavigateToArtistDetail(artist.id) }
                         )
                     }
-                    
-                    // Add the second artist as shown in the design
-                    PerformingArtistCard(
-                        name = "David Rawlings",
-                        subtitle = "North Smithfield,...",
-                        imageUrl = "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-                        onClick = { onNavigateToArtistDetail("david_rawlings") }
-                    )
+
+                    event?.artists?.drop(1)?.firstOrNull()?.let { artist ->
+                        PerformingArtistCard(
+                            name = artist.name,
+                            subtitle = "",
+                            imageUrl = artist.imageUrl,
+                            onClick = { onNavigateToArtistDetail(artist.id) }
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))
