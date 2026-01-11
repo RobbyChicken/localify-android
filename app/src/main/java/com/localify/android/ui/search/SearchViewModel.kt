@@ -14,6 +14,7 @@ import com.localify.android.data.models.Artist
 import com.localify.android.data.models.Venue
 import com.localify.android.data.network.NetworkModule
 import com.localify.android.data.network.SearchV1Response
+import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,7 +64,9 @@ class SearchViewModel : ViewModel() {
             try {
                 delay(300)
 
-                val response = apiService.searchV1(query = query, autoSearchSpotify = null)
+                val response = callWithGuestAuthRetry {
+                    apiService.searchV1(query = query, autoSearchSpotify = null)
+                }
                 if (!response.isSuccessful) {
                     val errorBody = response.errorBody()?.string()
                     throw Exception("Search failed (${response.code()}) - $errorBody")
@@ -97,6 +100,30 @@ class SearchViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    private suspend fun <T> callWithGuestAuthRetry(block: suspend () -> Response<T>): Response<T> {
+        if (!NetworkModule.hasValidAuth()) {
+            val guest = apiService.createGuestUser()
+            if (guest.isSuccessful) {
+                val auth = guest.body()
+                if (auth != null) NetworkModule.storeAuth(auth)
+            }
+        }
+
+        val initial = block()
+        if (initial.code() != 401) return initial
+
+        val guest = apiService.createGuestUser()
+        if (guest.isSuccessful) {
+            val auth = guest.body()
+            if (auth != null) {
+                NetworkModule.storeAuth(auth)
+                return block()
+            }
+        }
+
+        return initial
     }
 
     private fun com.localify.android.data.network.ArtistV1Response.toUiArtist(): Artist {

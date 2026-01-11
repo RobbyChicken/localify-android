@@ -1,5 +1,6 @@
 package com.localify.android.ui.auth
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -27,8 +29,83 @@ import kotlin.random.Random
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    spotifyCallbackUri: Uri? = null,
+    onConsumeSpotifyCallback: () -> Unit = {},
+    viewModel: LoginViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+
+    var showEmailDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(spotifyCallbackUri) {
+        if (spotifyCallbackUri != null) {
+            viewModel.handleSpotifyRedirect(spotifyCallbackUri, onSuccess = onLoginSuccess)
+            onConsumeSpotifyCallback()
+        }
+    }
+
+    if (showEmailDialog) {
+        AlertDialog(
+            onDismissRequest = { showEmailDialog = false },
+            title = { Text("Log in with Email") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = uiState.email,
+                        onValueChange = { viewModel.updateEmail(it) },
+                        label = { Text("Email") },
+                        singleLine = true,
+                        enabled = !uiState.isLoading
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (uiState.emailNonce != null) {
+                        OutlinedTextField(
+                            value = uiState.emailCode,
+                            onValueChange = { viewModel.updateEmailCode(it) },
+                            label = { Text("Code") },
+                            singleLine = true,
+                            enabled = !uiState.isLoading
+                        )
+                    }
+
+                    if (uiState.error != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(uiState.error ?: "", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                if (uiState.emailNonce == null) {
+                    TextButton(
+                        onClick = { viewModel.sendEmailLoginCode() },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Text("Send code")
+                    }
+                } else {
+                    TextButton(
+                        onClick = { viewModel.verifyEmailLogin(onSuccess = onLoginSuccess) },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Text("Verify")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEmailDialog = false },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -131,10 +208,11 @@ fun LoginScreen(
             ) {
                 // Spotify Login
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = { viewModel.startSpotifyLogin(context) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = !uiState.isLoading,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF1DB954)
                     ),
@@ -162,10 +240,11 @@ fun LoginScreen(
                 
                 // Apple Login
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = { },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White
                     ),
@@ -193,10 +272,11 @@ fun LoginScreen(
                 
                 // Email Login
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = { showEmailDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = !uiState.isLoading,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFE91E63)
                     ),
@@ -224,10 +304,11 @@ fun LoginScreen(
                 
                 // Guest Mode
                 Button(
-                    onClick = onLoginSuccess,
+                    onClick = { viewModel.continueAsGuest(onSuccess = onLoginSuccess) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = !uiState.isLoading,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF2196F3)
                     ),
@@ -255,6 +336,19 @@ fun LoginScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
+
+            if (uiState.isLoading) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (uiState.error != null && !showEmailDialog) {
+                Text(
+                    text = uiState.error ?: "",
+                    color = Color.Red,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

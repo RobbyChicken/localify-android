@@ -156,6 +156,19 @@ fun SearchScreen(
                         )
                     }
                 }
+                uiState.error != null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = uiState.error ?: "Search failed",
+                            color = Color.Red,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
                 uiState.searchQuery.isBlank() -> {
                     EmptySearchState(
                         modifier = Modifier.fillMaxSize()

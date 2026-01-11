@@ -1,5 +1,7 @@
 package com.localify.android
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,11 +35,15 @@ enum class Screen {
 
 class MainActivity : ComponentActivity() {
     private lateinit var userPreferences: UserPreferences
+
+    private val pendingAuthUri = mutableStateOf<Uri?>(null)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NetworkModule.init(this)
         userPreferences = UserPreferences(this)
+
+        pendingAuthUri.value = intent?.data
         
         setContent {
             LocalifyTheme {
@@ -61,7 +67,10 @@ class MainActivity : ComponentActivity() {
                     
                     when (currentScreen) {
                         Screen.LOGIN -> {
+                            val authUri = pendingAuthUri.value
                             LoginScreen(
+                                spotifyCallbackUri = authUri,
+                                onConsumeSpotifyCallback = { pendingAuthUri.value = null },
                                 onLoginSuccess = {
                                     userPreferences.setLoggedIn(true)
                                     currentScreen = Screen.ONBOARDING
@@ -186,5 +195,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        pendingAuthUri.value = intent.data
     }
 }
