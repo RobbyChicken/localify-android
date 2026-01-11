@@ -2,31 +2,31 @@ package com.localify.android.data.repository
 
 import com.localify.android.data.models.Artist
 import com.localify.android.data.models.Event
-import com.localify.android.data.network.NetworkModule
 
+@Suppress("UNUSED_PARAMETER")
 class ArtistRepository {
-    suspend fun getArtistsByIds(artistIds: List<String>): List<Artist> {
+    suspend fun getArtistsByIds(_artistIds: List<String>): List<Artist> {
         // This is now deprecated - use HomeRepository for recommendations
         throw Exception("Use HomeRepository for artist recommendations")
     }
     
-    suspend fun getArtist(artistId: String): Result<Artist> {
+    suspend fun getArtist(_artistId: String): Result<Artist> {
         throw Exception("Use HomeRepository for artist data")
     }
     
-    suspend fun getArtistEvents(artistId: String): Result<List<com.localify.android.data.models.Event>> {
+    suspend fun getArtistEvents(_artistId: String): Result<List<com.localify.android.data.models.Event>> {
         throw Exception("Use HomeRepository for event data")
     }
     
-    suspend fun favoriteArtist(artistId: String): Result<Unit> {
+    suspend fun favoriteArtist(_artistId: String): Result<Unit> {
         throw Exception("Favorites not implemented yet")
     }
     
-    suspend fun unfavoriteArtist(artistId: String): Result<Unit> {
+    suspend fun unfavoriteArtist(_artistId: String): Result<Unit> {
         throw Exception("Favorites not implemented yet")
     }
     
-    suspend fun isArtistFavorited(artistId: String): Result<Boolean> {
+    suspend fun isArtistFavorited(_artistId: String): Result<Boolean> {
         return try {
             // TODO: Replace with real API call when backend is ready
             Result.failure(Exception("No internet connection. Please check your network and try again."))

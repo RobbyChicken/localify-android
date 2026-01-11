@@ -140,7 +140,6 @@ fun CitySelectionModal(
             if (response.isSuccessful) {
                 searchResults = response.body().orEmpty()
             } else {
-                val errorBody = response.errorBody()?.string()
                 searchError = "Failed to search cities (${response.code()})"
                 searchResults = emptyList()
             }

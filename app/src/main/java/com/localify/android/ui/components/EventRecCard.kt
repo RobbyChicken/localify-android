@@ -145,7 +145,8 @@ fun EventRecCard(
                 .padding(12.dp)
         ) {
                 // Location overlay
-                event.venue?.let { venue ->
+                run {
+                    val venue = event.venue
                     Row(
                         modifier = Modifier
                             .background(
@@ -184,17 +185,15 @@ fun EventRecCard(
                 )
                 
                 // Artists
-                event.artists?.let { artists ->
-                    if (artists.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Artists: ${artists.map { it.name }.joinToString(", ")}",
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                if (event.artists.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Artists: ${event.artists.map { it.name }.joinToString(", ")}",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(8.dp))

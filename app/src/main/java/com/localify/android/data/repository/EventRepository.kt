@@ -1,8 +1,8 @@
 package com.localify.android.data.repository
 
 import com.localify.android.data.models.Event
-import com.localify.android.data.network.NetworkModule
 
+@Suppress("UNUSED_PARAMETER")
 class EventRepository {
 
     suspend fun getFeaturedEvents(): List<Event> {
@@ -10,7 +10,7 @@ class EventRepository {
         throw Exception("Use HomeRepository for event recommendations")
     }
     
-    suspend fun getEventsByIds(eventIds: List<String>): List<Event> {
+    suspend fun getEventsByIds(_eventIds: List<String>): List<Event> {
         // This is now deprecated - use HomeRepository for event recommendations
         throw Exception("Use HomeRepository for event recommendations")
     }

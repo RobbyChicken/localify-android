@@ -63,8 +63,6 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
-    // Debug state
-    var showDebugDialog by remember { mutableStateOf(false) }
     var debugInfo by remember { mutableStateOf("") }
     
     // UI state
@@ -116,11 +114,9 @@ fun HomeScreen(
         println(debugInfo)
     }
     
-    val savedCity by userPreferences.selectedCity.collectAsState()
     var showCityModal by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showDebugInfo by remember { mutableStateOf(false) }
     var selectedTimeFrame by remember { mutableStateOf("Custom") }
     var startDate by remember { mutableStateOf("Sep 7, 2025") }
     var endDate by remember { mutableStateOf("Sep 8, 2025") }
@@ -386,8 +382,6 @@ fun HomeScreen(
                             } else {
                                 LazyColumn {
                                     items(uiState.events) { event ->
-                                        val context = LocalContext.current
-                                        val userPreferences = remember { UserPreferences(context) }
                                         val favoriteEvents by userPreferences.favoriteEvents.collectAsState()
                                         
                                         com.localify.android.ui.components.EventRecCard(
@@ -482,8 +476,6 @@ fun HomeScreen(
                                     contentPadding = PaddingValues(vertical = 8.dp)
                                 ) {
                                     items(uiState.artists) { artist ->
-                                        val context = LocalContext.current
-                                        val userPreferences = remember { UserPreferences(context) }
                                         val favoriteArtists by userPreferences.favoriteArtists.collectAsState()
                                         
                                         com.localify.android.ui.components.ArtistRecCard(

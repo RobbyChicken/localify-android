@@ -244,7 +244,7 @@ fun ArtistRecCard(
                             .clip(CircleShape)
                             .background(Color(0xFF4A90E2))
                             .clickable { 
-                                artist.spotifyUrl?.let { url ->
+                                artist.spotifyUrl?.let { _ ->
                                     // TODO: Handle Spotify URL (open in app or browser)
                                 }
                             },
