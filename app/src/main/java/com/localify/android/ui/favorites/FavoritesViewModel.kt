@@ -111,6 +111,20 @@ class FavoritesViewModel(application: Application) : AndroidViewModel(applicatio
                 emptyList()
             }
 
+            // Some environments return 404 for the upcoming/past endpoints.
+            // Fall back to fetching the full favorites list and split locally.
+            if (upcomingEventsResponse.code() == 404 || pastEventsResponse.code() == 404) {
+                val allEventsResp = callWithGuestAuthRetry { apiService.getFavoriteEventsV1(page = FAVORITES_PAGE, limit = FAVORITES_LIMIT) }
+                if (allEventsResp.isSuccessful) {
+                    val all = allEventsResp.body()?.content.orEmpty()
+                    val now = System.currentTimeMillis()
+                    val upcoming = all.filter { it.startTime >= now }
+                    val past = all.filter { it.startTime < now }
+                    upcomingEvents = upcoming.map { it.toUiEvent() }
+                    pastEvents = past.map { it.toUiEvent() }
+                }
+            }
+
             val backendArtistIds = favoriteArtists.map { it.id }.toSet()
             val backendEventIds = (upcomingEvents + pastEvents).map { it.id }.toSet()
 
@@ -151,6 +165,30 @@ class FavoritesViewModel(application: Application) : AndroidViewModel(applicatio
                 } else {
                     emptyList()
                 }
+
+                if (upcomingEventsResponse.code() == 404 || pastEventsResponse.code() == 404) {
+                    val allEventsResp = callWithGuestAuthRetry { apiService.getFavoriteEventsV1(page = FAVORITES_PAGE, limit = FAVORITES_LIMIT) }
+                    if (allEventsResp.isSuccessful) {
+                        val all = allEventsResp.body()?.content.orEmpty()
+                        val now = System.currentTimeMillis()
+                        val upcoming = all.filter { it.startTime >= now }
+                        val past = all.filter { it.startTime < now }
+                        upcomingEvents = upcoming.map { it.toUiEvent() }
+                        pastEvents = past.map { it.toUiEvent() }
+                    }
+                }
+            }
+
+            // Last resort: if backend didn't return any events but local prefs has event IDs,
+            // fetch each event by id to display something.
+            if (upcomingEvents.isEmpty() && pastEvents.isEmpty() && localEventIds.isNotEmpty()) {
+                val resolved = localEventIds.mapNotNull { id ->
+                    val resp = callWithGuestAuthRetry { apiService.getEventV1(id) }
+                    if (resp.isSuccessful) resp.body() else null
+                }
+                val now = System.currentTimeMillis()
+                upcomingEvents = resolved.filter { it.startTime >= now }.map { it.toUiEvent() }
+                pastEvents = resolved.filter { it.startTime < now }.map { it.toUiEvent() }
             }
 
             // Keep local prefs as a cache, but do not delete local favorites based on backend.

@@ -126,8 +126,9 @@ fun FavoritesScreen(
                 .padding(16.dp)
         ) {
             // Title
+            val title = if (uiState.selectedTab == FavoritesTab.ARTISTS) "My Artists" else "My Events"
             Text(
-                text = "My Artists",
+                text = title,
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
@@ -139,26 +140,25 @@ fun FavoritesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.Center
             ) {
-                TabButton(
-                    text = "Artists",
-                    isSelected = uiState.selectedTab == FavoritesTab.ARTISTS,
-                    onClick = { viewModel.selectTab(FavoritesTab.ARTISTS) },
-                    modifier = Modifier.weight(1f)
-                )
-                TabButton(
-                    text = "Upcoming Events",
-                    isSelected = uiState.selectedTab == FavoritesTab.UPCOMING_EVENTS,
-                    onClick = { viewModel.selectTab(FavoritesTab.UPCOMING_EVENTS) },
-                    modifier = Modifier.weight(1f)
-                )
-                TabButton(
-                    text = "Past Events",
-                    isSelected = uiState.selectedTab == FavoritesTab.PAST_EVENTS,
-                    onClick = { viewModel.selectTab(FavoritesTab.PAST_EVENTS) },
-                    modifier = Modifier.weight(1f)
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TabButton(
+                        text = "Artists",
+                        isSelected = uiState.selectedTab == FavoritesTab.ARTISTS,
+                        onClick = { viewModel.selectTab(FavoritesTab.ARTISTS) }
+                    )
+                    TabButton(
+                        text = "Upcoming",
+                        isSelected = uiState.selectedTab == FavoritesTab.UPCOMING_EVENTS,
+                        onClick = { viewModel.selectTab(FavoritesTab.UPCOMING_EVENTS) }
+                    )
+                    TabButton(
+                        text = "Past Events",
+                        isSelected = uiState.selectedTab == FavoritesTab.PAST_EVENTS,
+                        onClick = { viewModel.selectTab(FavoritesTab.PAST_EVENTS) }
+                    )
+                }
             }
             
             // Content
