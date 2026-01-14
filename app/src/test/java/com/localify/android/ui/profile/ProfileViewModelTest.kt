@@ -23,7 +23,7 @@ class ProfileViewModelTest {
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
 
-    private val testDispatcher = UnconfinedTestDispatcher()
+    private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var context: Context
 
@@ -59,13 +59,13 @@ class ProfileViewModelTest {
     @Test
     fun `toggleEmailOptIn updates emailOptIn state`() {
         // When
-        viewModel.toggleEmailOptIn(true)
+        viewModel.setEmailOptIn(true)
 
         // Then
         assertTrue(viewModel.uiState.value.emailOptIn)
 
         // When
-        viewModel.toggleEmailOptIn(false)
+        viewModel.setEmailOptIn(false)
 
         // Then
         assertFalse(viewModel.uiState.value.emailOptIn)
@@ -74,13 +74,13 @@ class ProfileViewModelTest {
     @Test
     fun `toggleSpotifyPlaylists updates generateSpotifyPlaylists state`() {
         // When
-        viewModel.toggleSpotifyPlaylists(true)
+        viewModel.setGenerateSpotifyPlaylists(true)
 
         // Then
         assertTrue(viewModel.uiState.value.generateSpotifyPlaylists)
 
         // When
-        viewModel.toggleSpotifyPlaylists(false)
+        viewModel.setGenerateSpotifyPlaylists(false)
 
         // Then
         assertFalse(viewModel.uiState.value.generateSpotifyPlaylists)
@@ -89,13 +89,13 @@ class ProfileViewModelTest {
     @Test
     fun `togglePlaylistsIncludeLocal updates playlistsIncludeLocalOnly state`() {
         // When
-        viewModel.togglePlaylistsIncludeLocal(true)
+        viewModel.setPlaylistsIncludeLocalOnly(true)
 
         // Then
         assertTrue(viewModel.uiState.value.playlistsIncludeLocalOnly)
 
         // When
-        viewModel.togglePlaylistsIncludeLocal(false)
+        viewModel.setPlaylistsIncludeLocalOnly(false)
 
         // Then
         assertFalse(viewModel.uiState.value.playlistsIncludeLocalOnly)

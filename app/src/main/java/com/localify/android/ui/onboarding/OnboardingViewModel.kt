@@ -1,20 +1,26 @@
 package com.localify.android.ui.onboarding
 
 import android.app.Application
+import android.location.Geocoder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.localify.android.data.network.CityResponse
 import com.localify.android.data.network.GenreV1Response
 import com.localify.android.data.network.ArtistV1Response
 import com.localify.android.data.network.AuthResponse
+import com.localify.android.data.network.ApiService
 import com.localify.android.data.network.NetworkModule
 import com.localify.android.data.network.AddCityRequest
 import com.localify.android.data.network.SeedsRequest
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.util.Locale
 
 data class OnboardingUiState(
     val isLoadingCities: Boolean = false,
@@ -27,9 +33,11 @@ data class OnboardingUiState(
     val error: String? = null
 )
 
-class OnboardingViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val apiService = NetworkModule.apiService
+class OnboardingViewModel(
+    application: Application,
+    private val apiService: ApiService = NetworkModule.apiService,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -49,9 +57,49 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     throw Exception("Failed to search cities (${response.code()}) - $errorBody")
                 }
 
+                val normalized = response.body().orEmpty().map { city ->
+                    if (!city.state.isNullOrBlank()) return@map city
+
+                    val rawName = runCatching { city.name }.getOrDefault("")
+                    val parts = rawName.split(",")
+                    val cityName = parts.firstOrNull()?.trim().orEmpty().ifBlank { rawName }
+                    val state = parts.getOrNull(1)?.trim()
+                    if (state.isNullOrBlank()) return@map city
+
+                    city.copy(name = cityName, state = state)
+                }
+
+                val withState = withContext(ioDispatcher) {
+                    val geocoder = Geocoder(getApplication(), Locale.US)
+                    normalized.map { city ->
+                        if (!city.state.isNullOrBlank()) return@map city
+                        val country = runCatching { city.country.trim() }.getOrDefault("")
+                        val isUs = country.equals("US", ignoreCase = true) ||
+                            country.equals("USA", ignoreCase = true) ||
+                            country.isBlank()
+                        if (!isUs) return@map city
+
+                        val adminArea = try {
+                            @Suppress("DEPRECATION")
+                            geocoder.getFromLocation(city.latitude, city.longitude, 1)
+                                ?.firstOrNull()
+                                ?.adminArea
+                        } catch (_: Exception) {
+                            null
+                        }
+
+                        val abbr = adminArea
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { stateNameToAbbr[it] ?: it }
+
+                        if (abbr.isNullOrBlank()) city else city.copy(state = abbr)
+                    }
+                }
+
                 _uiState.value = _uiState.value.copy(
                     isLoadingCities = false,
-                    cityResults = response.body().orEmpty()
+                    cityResults = withState
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -62,6 +110,60 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+
+    private val stateNameToAbbr: Map<String, String> = mapOf(
+        "Alabama" to "AL",
+        "Alaska" to "AK",
+        "Arizona" to "AZ",
+        "Arkansas" to "AR",
+        "California" to "CA",
+        "Colorado" to "CO",
+        "Connecticut" to "CT",
+        "Delaware" to "DE",
+        "District of Columbia" to "DC",
+        "Florida" to "FL",
+        "Georgia" to "GA",
+        "Hawaii" to "HI",
+        "Idaho" to "ID",
+        "Illinois" to "IL",
+        "Indiana" to "IN",
+        "Iowa" to "IA",
+        "Kansas" to "KS",
+        "Kentucky" to "KY",
+        "Louisiana" to "LA",
+        "Maine" to "ME",
+        "Maryland" to "MD",
+        "Massachusetts" to "MA",
+        "Michigan" to "MI",
+        "Minnesota" to "MN",
+        "Mississippi" to "MS",
+        "Missouri" to "MO",
+        "Montana" to "MT",
+        "Nebraska" to "NE",
+        "Nevada" to "NV",
+        "New Hampshire" to "NH",
+        "New Jersey" to "NJ",
+        "New Mexico" to "NM",
+        "New York" to "NY",
+        "North Carolina" to "NC",
+        "North Dakota" to "ND",
+        "Ohio" to "OH",
+        "Oklahoma" to "OK",
+        "Oregon" to "OR",
+        "Pennsylvania" to "PA",
+        "Rhode Island" to "RI",
+        "South Carolina" to "SC",
+        "South Dakota" to "SD",
+        "Tennessee" to "TN",
+        "Texas" to "TX",
+        "Utah" to "UT",
+        "Vermont" to "VT",
+        "Virginia" to "VA",
+        "Washington" to "WA",
+        "West Virginia" to "WV",
+        "Wisconsin" to "WI",
+        "Wyoming" to "WY"
+    )
 
     fun loadCuratedGenres() {
         if (_uiState.value.curatedGenres.isNotEmpty() || _uiState.value.isLoadingGenres) return

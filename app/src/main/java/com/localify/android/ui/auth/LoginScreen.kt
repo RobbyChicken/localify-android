@@ -22,6 +22,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.localify.android.R
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.Path
@@ -36,6 +41,28 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+
+    val googleWebClientId = remember {
+        context.getString(R.string.google_web_client_id).trim()
+    }
+
+    val googleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            val account = task.getResult(ApiException::class.java)
+            val token = account.idToken
+            if (token.isNullOrBlank()) {
+                viewModel.handleGoogleIdToken("", onSuccess = onLoginSuccess)
+            } else {
+                viewModel.handleGoogleIdToken(token, onSuccess = onLoginSuccess)
+            }
+        } catch (e: Exception) {
+            // surfacing via viewmodel keeps UI consistent
+            viewModel.handleGoogleIdToken("", onSuccess = onLoginSuccess)
+        }
+    }
 
     var showEmailDialog by remember { mutableStateOf(false) }
 
@@ -206,6 +233,50 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Google Login
+                Button(
+                    onClick = {
+                        if (googleWebClientId.isBlank()) {
+                            viewModel.setError("Missing GOOGLE_WEB_CLIENT_ID configuration")
+                            return@Button
+                        }
+
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestEmail()
+                            .requestIdToken(googleWebClientId)
+                            .build()
+                        val client = GoogleSignIn.getClient(context, gso)
+                        googleLauncher.launch(client.signInIntent)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = !uiState.isLoading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "G",
+                            fontSize = 18.sp,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Sign in with Google",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = Color.Black
+                        )
+                    }
+                }
+
                 // Spotify Login
                 Button(
                     onClick = { viewModel.startSpotifyLogin(context) },
@@ -234,38 +305,6 @@ fun LoginScreen(
                                 fontWeight = FontWeight.SemiBold
                             ),
                             color = Color.White
-                        )
-                    }
-                }
-                
-                // Apple Login
-                Button(
-                    onClick = { },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = false,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(28.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "",
-                            fontSize = 18.sp,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Sign in with Apple",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = Color.Black
                         )
                     }
                 }

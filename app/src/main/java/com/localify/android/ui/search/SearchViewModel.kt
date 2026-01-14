@@ -9,9 +9,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import com.localify.android.data.models.Event
 import com.localify.android.data.models.Artist
 import com.localify.android.data.models.Venue
+import com.localify.android.data.network.ApiService
 import com.localify.android.data.network.NetworkModule
 import com.localify.android.data.network.SearchV1Response
 import retrofit2.Response
@@ -34,12 +36,14 @@ data class SearchUiState(
     val error: String? = null
 )
 
-class SearchViewModel : ViewModel() {
+class SearchViewModel(
+    private val apiService: ApiService = NetworkModule.apiService,
+    private val debounceMs: Long = 300
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    private val apiService by lazy { NetworkModule.apiService }
     private var searchJob: Job? = null
     
     fun updateSearchQuery(query: String) {
@@ -62,7 +66,7 @@ class SearchViewModel : ViewModel() {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
             try {
-                delay(300)
+                delay(debounceMs)
 
                 val response = callWithGuestAuthRetry {
                     apiService.searchV1(query = query, autoSearchSpotify = null)
@@ -93,6 +97,10 @@ class SearchViewModel : ViewModel() {
                         cities = mappedCities
                     )
                 )
+            } catch (e: CancellationException) {
+                // Expected when query changes rapidly or the ViewModel scope is canceled.
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

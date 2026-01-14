@@ -22,13 +22,20 @@ android {
         // Load from .env file, environment variable, or gradle property
         def envFile = rootProject.file('.env')
         def envApiKey = ""
+        def envGoogleWebClientId = ""
         if (envFile.exists()) {
             envFile.readLines().each { line ->
                 if (line.startsWith('GOOGLE_MAPS_API_KEY=')) {
                     envApiKey = line.substring('GOOGLE_MAPS_API_KEY='.length())
                 }
+                if (line.startsWith('GOOGLE_WEB_CLIENT_ID=')) {
+                    envGoogleWebClientId = line.substring('GOOGLE_WEB_CLIENT_ID='.length())
+                }
             }
         }
+
+        def googleWebClientId = envGoogleWebClientId ?: System.getenv('GOOGLE_WEB_CLIENT_ID') ?: (project.findProperty('GOOGLE_WEB_CLIENT_ID') ?: "")
+        resValue "string", "google_web_client_id", "${googleWebClientId}"
         manifestPlaceholders = [
             MAPS_API_KEY: envApiKey ?: System.getenv('GOOGLE_MAPS_API_KEY') ?: (project.findProperty('MAPS_API_KEY') ?: "")
         ]
@@ -103,6 +110,8 @@ dependencies {
     implementation 'com.google.android.gms:play-services-maps:18.2.0'
     // Use a maps-compose version compatible with Compose 1.4.x
     implementation 'com.google.maps.android:maps-compose:2.11.4'
+
+    implementation 'com.google.android.gms:play-services-auth:20.7.0'
     
     // Testing
     testImplementation 'junit:junit:4.13.2'

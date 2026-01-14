@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.localify.android.data.network.ApiService
 import com.localify.android.data.network.EmailLoginRequest
 import com.localify.android.data.network.EmailVerificationRequest
 import com.localify.android.data.network.NetworkModule
@@ -24,9 +25,9 @@ data class LoginUiState(
     val spotifyExpectedState: String? = null
 )
 
-class LoginViewModel : ViewModel() {
-
-    private val apiService = NetworkModule.apiService
+class LoginViewModel(
+    private val apiService: ApiService = NetworkModule.apiService
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -35,6 +36,36 @@ class LoginViewModel : ViewModel() {
 
     fun updateEmail(email: String) {
         _uiState.value = _uiState.value.copy(email = email, error = null)
+    }
+
+    fun setError(message: String) {
+        _uiState.value = _uiState.value.copy(isLoading = false, error = message)
+    }
+
+    fun handleGoogleIdToken(idToken: String, onSuccess: () -> Unit) {
+        if (idToken.isBlank()) {
+            _uiState.value = _uiState.value.copy(error = "Missing Google token")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val resp = apiService.exchangeToken(TokenExchangeRequest(token = idToken, secret = "google"))
+                if (!resp.isSuccessful) {
+                    val errorBody = resp.errorBody()?.string()
+                    throw Exception("Google login failed (${resp.code()}) - $errorBody")
+                }
+
+                val auth = resp.body() ?: throw Exception("Missing auth response")
+                NetworkModule.storeAuth(auth)
+
+                _uiState.value = LoginUiState()
+                onSuccess()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Google login failed")
+            }
+        }
     }
 
     fun updateEmailCode(code: String) {

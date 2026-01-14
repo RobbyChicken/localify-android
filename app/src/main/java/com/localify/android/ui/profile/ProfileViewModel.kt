@@ -7,9 +7,12 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.localify.android.data.network.ApiService
 import com.localify.android.data.network.NetworkModule
 import com.localify.android.data.network.PatchUserDetailsRequest
 import com.localify.android.data.network.UserDetailsV1Response
+import com.localify.android.data.network.UserCityResponse
+import com.localify.android.data.network.SeedV1Response
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,25 +33,41 @@ data class ProfileUiState(
     val emailOptIn: Boolean = false,
     val generateSpotifyPlaylists: Boolean = false,
     val playlistsIncludeLocalOnly: Boolean = false,
+    val myCities: List<String> = emptyList(),
+    val myFamiliarArtists: List<String> = emptyList(),
+    val isLoadingCities: Boolean = false,
+    val isLoadingFamiliarArtists: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )
 
-class ProfileViewModel : ViewModel() {
+class ProfileViewModel(
+    private val apiService: ApiService = NetworkModule.apiService
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
-    private val apiService = NetworkModule.apiService
-
     init {
         loadProfile()
+    }
+
+    private suspend fun ensureGuestAuth() {
+        if (NetworkModule.hasValidAuth()) return
+        val guest = apiService.createGuestUser()
+        if (guest.isSuccessful) {
+            val auth = guest.body()
+            if (auth != null) {
+                NetworkModule.storeAuth(auth)
+            }
+        }
     }
 
     fun loadProfile() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
+                ensureGuestAuth()
                 val response = apiService.getMe()
                 if (!response.isSuccessful) {
                     val errorBody = response.errorBody()?.string()
@@ -61,6 +80,62 @@ class ProfileViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.message ?: "Failed to load profile"
+                )
+            }
+        }
+    }
+
+    fun loadMyCities(context: Context) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingCities = true, error = null)
+            try {
+                ensureGuestAuth()
+                val response = apiService.getUserCities()
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    throw Exception("Failed to load cities (${response.code()}) - $errorBody")
+                }
+
+                val body: UserCityResponse = response.body() ?: throw Exception("Missing cities response")
+                val cities = buildList {
+                    add(body.current.name)
+                    body.others.orEmpty().forEach { add(it.name) }
+                }.distinct()
+
+                _uiState.value = _uiState.value.copy(isLoadingCities = false, myCities = cities)
+            } catch (e: Exception) {
+                val fallback = UserPreferences(context).selectedCity.value
+                val fallbackList = if (fallback.isNotBlank()) listOf(fallback) else emptyList()
+                _uiState.value = _uiState.value.copy(
+                    isLoadingCities = false,
+                    myCities = fallbackList,
+                    error = e.message ?: "Failed to load cities"
+                )
+            }
+        }
+    }
+
+    fun loadMyFamiliarArtists(context: Context) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingFamiliarArtists = true, error = null)
+            try {
+                ensureGuestAuth()
+                val response = apiService.getUserSeedsAll()
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    throw Exception("Failed to load familiar artists (${response.code()}) - $errorBody")
+                }
+
+                val seeds: List<SeedV1Response> = response.body().orEmpty()
+                val artists = seeds.map { it.name }.distinct()
+
+                _uiState.value = _uiState.value.copy(isLoadingFamiliarArtists = false, myFamiliarArtists = artists)
+            } catch (e: Exception) {
+                val fallback = UserPreferences(context).selectedArtists.value.toList()
+                _uiState.value = _uiState.value.copy(
+                    isLoadingFamiliarArtists = false,
+                    myFamiliarArtists = fallback,
+                    error = e.message ?: "Failed to load familiar artists"
                 )
             }
         }

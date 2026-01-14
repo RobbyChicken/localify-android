@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,6 +43,9 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var showMyCities by remember { mutableStateOf(false) }
+    var showMyFamiliarArtists by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { snackbarHostState.showSnackbar(it) }
@@ -183,7 +187,9 @@ fun ProfileScreen(
                         text = uiState.userName,
                         color = Color.White,
                         fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
                     // Email (if connected)
@@ -192,7 +198,10 @@ fun ProfileScreen(
                             text = uiState.email,
                             color = Color(0xFF999999),
                             fontSize = 16.sp,
-                            modifier = Modifier.padding(top = 4.dp)
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
                         )
                     }
                     
@@ -201,28 +210,33 @@ fun ProfileScreen(
                         text = "Member since ${uiState.memberSince}",
                         color = Color.Gray,
                         fontSize = 14.sp,
-                        modifier = Modifier.padding(top = 4.dp)
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
                     )
                 }
             }
             
             // Edit Profile Button
-            Button(
-                onClick = { /* TODO: Handle edit profile */ },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4A90E2)
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    "Edit Profile",
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium
-                )
+            if (uiState.isLoggedIn) {
+                Button(
+                    onClick = { /* TODO: Handle edit profile */ },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4A90E2)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(bottom = 32.dp)
+                ) {
+                    Text(
+                        "Edit Profile",
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
             
             // My Favorites Section
@@ -231,19 +245,92 @@ fun ProfileScreen(
             ProfileMenuItem(
                 icon = Icons.Default.LocationOn,
                 title = "My Cities",
-                onClick = { /* TODO: Handle my cities */ }
+                onClick = {
+                    viewModel.loadMyCities(context)
+                    showMyCities = true
+                }
             )
             
             ProfileMenuItem(
                 icon = Icons.Default.Favorite,
                 title = "My Familiar Artists",
-                onClick = { /* TODO: Handle familiar artists */ }
+                onClick = {
+                    viewModel.loadMyFamiliarArtists(context)
+                    showMyFamiliarArtists = true
+                }
             )
             
             Spacer(modifier = Modifier.height(24.dp))
+
+            if (showMyCities) {
+                AlertDialog(
+                    onDismissRequest = { showMyCities = false },
+                    title = { Text("My Cities") },
+                    text = {
+                        when {
+                            uiState.isLoadingCities -> {
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                            uiState.myCities.isEmpty() -> {
+                                Text("No cities yet")
+                            }
+                            else -> {
+                                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                    uiState.myCities.forEach { city ->
+                                        Text(city, modifier = Modifier.padding(vertical = 6.dp))
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showMyCities = false }) { Text("Close") }
+                    }
+                )
+            }
+
+            if (showMyFamiliarArtists) {
+                AlertDialog(
+                    onDismissRequest = { showMyFamiliarArtists = false },
+                    title = { Text("My Familiar Artists") },
+                    text = {
+                        when {
+                            uiState.isLoadingFamiliarArtists -> {
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                            uiState.myFamiliarArtists.isEmpty() -> {
+                                Text("No familiar artists yet")
+                            }
+                            else -> {
+                                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                    uiState.myFamiliarArtists.forEach { artistName ->
+                                        Text(artistName, modifier = Modifier.padding(vertical = 6.dp))
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showMyFamiliarArtists = false }) { Text("Close") }
+                    }
+                )
+            }
             
             // My Preferences Section
             SectionHeader("My Preferences")
+
+            if (!uiState.isEmailConnected && !uiState.isSpotifyConnected) {
+                Text(
+                    text = "Connect Email or Spotify to manage preferences.",
+                    color = Color.Gray,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
             
             // Email Opt-in Toggle (only show if email is connected)
             if (uiState.isEmailConnected) {
