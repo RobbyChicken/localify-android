@@ -41,7 +41,7 @@ data class ProfileUiState(
     val error: String? = null
 )
 
-class ProfileViewModel(
+class ProfileViewModel @JvmOverloads constructor(
     private val apiService: ApiService = NetworkModule.apiService
 ) : ViewModel() {
 

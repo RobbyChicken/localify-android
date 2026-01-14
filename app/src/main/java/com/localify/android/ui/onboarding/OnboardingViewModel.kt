@@ -33,7 +33,7 @@ data class OnboardingUiState(
     val error: String? = null
 )
 
-class OnboardingViewModel(
+class OnboardingViewModel @JvmOverloads constructor(
     application: Application,
     private val apiService: ApiService = NetworkModule.apiService,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO

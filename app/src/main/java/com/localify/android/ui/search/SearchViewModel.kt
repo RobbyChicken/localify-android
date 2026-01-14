@@ -36,7 +36,7 @@ data class SearchUiState(
     val error: String? = null
 )
 
-class SearchViewModel(
+class SearchViewModel @JvmOverloads constructor(
     private val apiService: ApiService = NetworkModule.apiService,
     private val debounceMs: Long = 300
 ) : ViewModel() {

@@ -25,7 +25,7 @@ data class LoginUiState(
     val spotifyExpectedState: String? = null
 )
 
-class LoginViewModel(
+class LoginViewModel @JvmOverloads constructor(
     private val apiService: ApiService = NetworkModule.apiService
 ) : ViewModel() {
 
