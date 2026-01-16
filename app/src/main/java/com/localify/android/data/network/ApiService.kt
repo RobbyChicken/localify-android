@@ -681,7 +681,7 @@ data class CityResponse(
     val id: String,
     val name: String,
     val state: String?,
-    val country: String,
+    val country: String?,
     val latitude: Double,
     val longitude: Double
 )
@@ -690,7 +690,7 @@ data class UserCityItem(
     val id: String,
     val name: String,
     val state: String?,
-    val country: String,
+    val country: String?,
     val latitude: Double,
     val longitude: Double,
     val radius: Double,

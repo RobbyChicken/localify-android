@@ -257,6 +257,7 @@ fun SearchScreen(
                             }
                             items(uiState.searchResults.cities) { city ->
                                 val subtitle = listOf(city.state, city.country)
+                                    .filterNotNull()
                                     .filter { it.isNotBlank() }
                                     .joinToString(", ")
                                 SimpleResultRow(

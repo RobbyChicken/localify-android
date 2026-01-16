@@ -73,7 +73,7 @@ class OnboardingViewModel @JvmOverloads constructor(
                     val geocoder = Geocoder(getApplication(), Locale.US)
                     normalized.map { city ->
                         if (!city.state.isNullOrBlank()) return@map city
-                        val country = runCatching { city.country.trim() }.getOrDefault("")
+                        val country = runCatching { city.country?.trim().orEmpty() }.getOrDefault("")
                         val isUs = country.equals("US", ignoreCase = true) ||
                             country.equals("USA", ignoreCase = true) ||
                             country.isBlank()
