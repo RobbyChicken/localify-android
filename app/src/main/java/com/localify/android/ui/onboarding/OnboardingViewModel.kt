@@ -12,8 +12,12 @@ import com.localify.android.data.network.ApiService
 import com.localify.android.data.network.NetworkModule
 import com.localify.android.data.network.AddCityRequest
 import com.localify.android.data.network.SeedsRequest
+import com.localify.android.data.network.SearchV1Response
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +33,9 @@ data class OnboardingUiState(
     val curatedGenres: List<GenreV1Response> = emptyList(),
     val isLoadingArtists: Boolean = false,
     val popularArtists: List<ArtistV1Response> = emptyList(),
+    val isSearchingManualArtists: Boolean = false,
+    val manualArtistResults: List<ArtistV1Response> = emptyList(),
+    val manualArtistError: String? = null,
     val isCompleting: Boolean = false,
     val error: String? = null
 )
@@ -41,6 +48,8 @@ class OnboardingViewModel @JvmOverloads constructor(
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+
+    private var manualArtistSearchJob: Job? = null
 
     fun searchCities(query: String) {
         if (query.length < 2) {
@@ -106,6 +115,56 @@ class OnboardingViewModel @JvmOverloads constructor(
                     isLoadingCities = false,
                     cityResults = emptyList(),
                     error = e.message ?: "Failed to search cities"
+                )
+            }
+        }
+    }
+
+    fun searchArtistsManual(query: String) {
+        if (query.length < 2) {
+            manualArtistSearchJob?.cancel()
+            _uiState.value = _uiState.value.copy(
+                isSearchingManualArtists = false,
+                manualArtistResults = emptyList(),
+                manualArtistError = null
+            )
+            return
+        }
+
+        manualArtistSearchJob?.cancel()
+        manualArtistSearchJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSearchingManualArtists = true, manualArtistError = null)
+            try {
+                delay(300)
+
+                val response = callWithGuestAuthRetry {
+                    apiService.searchV1(query = query, autoSearchSpotify = true)
+                }
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    throw Exception("Failed to search artists (${response.code()}) - $errorBody")
+                }
+
+                val body = response.body() ?: SearchV1Response(
+                    artists = emptyList(),
+                    events = emptyList(),
+                    venues = emptyList(),
+                    cities = emptyList()
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isSearchingManualArtists = false,
+                    manualArtistResults = body.artists,
+                    manualArtistError = null
+                )
+            } catch (e: CancellationException) {
+                _uiState.value = _uiState.value.copy(isSearchingManualArtists = false)
+                throw e
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isSearchingManualArtists = false,
+                    manualArtistResults = emptyList(),
+                    manualArtistError = e.message ?: "Failed to search artists"
                 )
             }
         }

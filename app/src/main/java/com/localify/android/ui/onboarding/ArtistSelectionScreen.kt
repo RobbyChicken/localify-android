@@ -33,13 +33,21 @@ data class SelectableArtist(
 fun ArtistSelectionScreen(
     selectedArtists: Set<String>,
     artists: List<ArtistV1Response>,
-    onArtistsChanged: (Set<String>) -> Unit
+    onArtistsChanged: (Set<String>) -> Unit,
+    isSearchingManualArtists: Boolean,
+    manualArtistResults: List<ArtistV1Response>,
+    manualArtistError: String?,
+    onManualSearchQueryChanged: (String) -> Unit
 ) {
     var searchText by remember { mutableStateOf("") }
     var showSearch by remember { mutableStateOf(false) }
 
-    val selectableArtists = remember(artists) {
-        artists.map {
+    val sourceArtists = remember(showSearch, searchText, artists, manualArtistResults) {
+        if (showSearch && searchText.length >= 2) manualArtistResults else artists
+    }
+
+    val selectableArtists = remember(sourceArtists) {
+        sourceArtists.map {
             SelectableArtist(
                 id = it.id,
                 name = it.name,
@@ -145,7 +153,10 @@ fun ArtistSelectionScreen(
             // Search field
             OutlinedTextField(
                 value = searchText,
-                onValueChange = { searchText = it },
+                onValueChange = {
+                    searchText = it
+                    onManualSearchQueryChanged(it)
+                },
                 placeholder = {
                     Text(
                         text = "Search artists",
@@ -171,12 +182,47 @@ fun ArtistSelectionScreen(
             )
             
             Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "Type at least 2 characters to search artists.",
-                color = Color.Gray,
-                fontSize = 14.sp
-            )
+
+            when {
+                searchText.length < 2 -> {
+                    Text(
+                        text = "Type at least 2 characters to search artists.",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                }
+                isSearchingManualArtists -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color(0xFFE91E63),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Searching…",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+                manualArtistError != null -> {
+                    Text(
+                        text = manualArtistError,
+                        color = Color.Red,
+                        fontSize = 14.sp
+                    )
+                }
+                manualArtistResults.isEmpty() -> {
+                    Text(
+                        text = "No artists found.",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                }
+            }
         }
         
     }

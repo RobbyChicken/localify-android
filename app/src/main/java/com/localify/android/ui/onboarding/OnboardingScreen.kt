@@ -211,9 +211,13 @@ fun OnboardingScreen(
                     selectedArtists = selectedArtists,
                     popularArtists = onboardingUiState.popularArtists,
                     isLoading = onboardingUiState.isLoadingArtists,
+                    isSearchingManualArtists = onboardingUiState.isSearchingManualArtists,
+                    manualArtistResults = onboardingUiState.manualArtistResults,
+                    manualArtistError = onboardingUiState.manualArtistError,
                     onArtistsChanged = { artists ->
                         selectedArtists = artists
-                    }
+                    },
+                    onManualSearchQueryChanged = { q -> onboardingViewModel.searchArtistsManual(q) }
                 )
             }
             
@@ -356,7 +360,11 @@ private fun ArtistSelectionContent(
     selectedArtists: Set<String>,
     popularArtists: List<com.localify.android.data.network.ArtistV1Response>,
     isLoading: Boolean,
-    onArtistsChanged: (Set<String>) -> Unit
+    isSearchingManualArtists: Boolean,
+    manualArtistResults: List<com.localify.android.data.network.ArtistV1Response>,
+    manualArtistError: String?,
+    onArtistsChanged: (Set<String>) -> Unit,
+    onManualSearchQueryChanged: (String) -> Unit
 ) {
     if (isLoading && popularArtists.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -368,6 +376,10 @@ private fun ArtistSelectionContent(
     ArtistSelectionScreen(
         selectedArtists = selectedArtists,
         artists = popularArtists,
-        onArtistsChanged = onArtistsChanged
+        onArtistsChanged = onArtistsChanged,
+        isSearchingManualArtists = isSearchingManualArtists,
+        manualArtistResults = manualArtistResults,
+        manualArtistError = manualArtistError,
+        onManualSearchQueryChanged = onManualSearchQueryChanged
     )
 }
