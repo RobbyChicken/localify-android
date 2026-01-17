@@ -48,8 +48,8 @@ class SearchViewModel @JvmOverloads constructor(
     
     fun updateSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
-        
-        if (query.isNotBlank()) {
+
+        if (query.length >= 2 && query.isNotBlank()) {
             performSearch(query)
         } else {
             searchJob?.cancel()
@@ -69,7 +69,7 @@ class SearchViewModel @JvmOverloads constructor(
                 delay(debounceMs)
 
                 val response = callWithGuestAuthRetry {
-                    apiService.searchV1(query = query, autoSearchSpotify = null)
+                    apiService.searchV1(query = query, autoSearchSpotify = true)
                 }
                 if (!response.isSuccessful) {
                     val errorBody = response.errorBody()?.string()
