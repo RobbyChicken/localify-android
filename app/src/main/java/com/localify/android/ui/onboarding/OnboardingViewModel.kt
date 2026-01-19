@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.util.LinkedHashMap
 import java.util.Locale
 
 data class OnboardingUiState(
@@ -50,6 +51,19 @@ class OnboardingViewModel @JvmOverloads constructor(
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     private var manualArtistSearchJob: Job? = null
+
+    private data class CachedArtists(
+        val artists: List<ArtistV1Response>,
+        val createdAtMs: Long
+    )
+
+    private val manualArtistCacheTtlMs: Long = 30_000
+    private val manualArtistMaxCacheEntries: Int = 25
+    private val manualArtistCache = object : LinkedHashMap<String, CachedArtists>(manualArtistMaxCacheEntries, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedArtists>): Boolean {
+            return size > manualArtistMaxCacheEntries
+        }
+    }
 
     fun searchCities(query: String) {
         if (query.length < 2) {
@@ -120,12 +134,36 @@ class OnboardingViewModel @JvmOverloads constructor(
         }
     }
 
+    private fun getCachedManualArtists(query: String): List<ArtistV1Response>? {
+        val cached = manualArtistCache[query] ?: return null
+        if (System.currentTimeMillis() - cached.createdAtMs > manualArtistCacheTtlMs) {
+            manualArtistCache.remove(query)
+            return null
+        }
+        return cached.artists
+    }
+
+    private fun putCachedManualArtists(query: String, artists: List<ArtistV1Response>) {
+        manualArtistCache[query] = CachedArtists(artists = artists, createdAtMs = System.currentTimeMillis())
+    }
+
     fun searchArtistsManual(query: String) {
         if (query.length < 2) {
             manualArtistSearchJob?.cancel()
             _uiState.value = _uiState.value.copy(
                 isSearchingManualArtists = false,
                 manualArtistResults = emptyList(),
+                manualArtistError = null
+            )
+            return
+        }
+
+        val cached = getCachedManualArtists(query)
+        if (cached != null) {
+            manualArtistSearchJob?.cancel()
+            _uiState.value = _uiState.value.copy(
+                isSearchingManualArtists = false,
+                manualArtistResults = cached,
                 manualArtistError = null
             )
             return
@@ -157,6 +195,8 @@ class OnboardingViewModel @JvmOverloads constructor(
                     manualArtistResults = body.artists,
                     manualArtistError = null
                 )
+
+                putCachedManualArtists(query = query, artists = body.artists)
             } catch (e: CancellationException) {
                 _uiState.value = _uiState.value.copy(isSearchingManualArtists = false)
                 throw e

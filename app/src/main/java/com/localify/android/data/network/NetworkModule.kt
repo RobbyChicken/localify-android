@@ -2,8 +2,11 @@ package com.localify.android.data.network
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.Interceptor
 import okhttp3.Authenticator
@@ -14,6 +17,7 @@ import okhttp3.Route
 import okhttp3.Response
 import android.util.Log
 import com.google.gson.Gson
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 object NetworkModule {
@@ -32,12 +36,14 @@ object NetworkModule {
     private lateinit var okHttpClient: OkHttpClient
     private lateinit var refreshClient: OkHttpClient
     private lateinit var retrofit: Retrofit
+    private lateinit var appContext: Context
 
     fun init(context: Context) {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
 
+            appContext = context.applicationContext
             authPrefs = context.applicationContext.getSharedPreferences(AUTH_PREFS_NAME, Context.MODE_PRIVATE)
             tokenStore = AuthTokenStore(authPrefs)
 
@@ -48,9 +54,16 @@ object NetworkModule {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
+            val cacheDir = File(appContext.cacheDir, "http_cache")
+            val cacheSizeBytes = 10L * 1024L * 1024L
+            val cache = Cache(cacheDir, cacheSizeBytes)
+
             okHttpClient = OkHttpClient.Builder()
+                .cache(cache)
+                .addInterceptor(offlineCacheRequestInterceptor)
                 .addInterceptor(AuthHeaderInterceptor(tokenStore))
                 .authenticator(TokenRefreshAuthenticator(tokenStore, refreshClient))
+                .addNetworkInterceptor(cacheControlResponseInterceptor)
                 .addInterceptor(loggingInterceptor)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -69,6 +82,59 @@ object NetworkModule {
 
     private fun ensureInitialized() {
         check(initialized) { "NetworkModule.init(context) must be called before using NetworkModule.apiService" }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return true
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun cacheTtlSecondsForPath(path: String): Int? {
+        return when (path) {
+            "/v1/search" -> 30
+            "/v1/cities/search" -> 60
+            "/v1/genres/curated" -> 3600
+            "/v1/genres/top" -> 3600
+            "/v1/artists/popular" -> 3600
+            else -> null
+        }
+    }
+
+    private val offlineCacheRequestInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        val path = request.url.encodedPath
+        val ttlSeconds = cacheTtlSecondsForPath(path)
+
+        if (ttlSeconds == null || request.method != "GET") {
+            return@Interceptor chain.proceed(request)
+        }
+
+        if (isNetworkAvailable()) {
+            return@Interceptor chain.proceed(request)
+        }
+
+        val offlineRequest = request.newBuilder()
+            .header("Cache-Control", "public, only-if-cached, max-stale=86400")
+            .build()
+        chain.proceed(offlineRequest)
+    }
+
+    private val cacheControlResponseInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        val response = chain.proceed(request)
+        val path = request.url.encodedPath
+        val ttlSeconds = cacheTtlSecondsForPath(path)
+
+        if (ttlSeconds == null || request.method != "GET") {
+            return@Interceptor response
+        }
+
+        response.newBuilder()
+            .header("Cache-Control", "public, max-age=$ttlSeconds")
+            .build()
     }
 
     val apiService: ApiService by lazy {

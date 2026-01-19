@@ -19,6 +19,7 @@ import com.localify.android.data.network.SearchV1Response
 import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.TimeZone
 
@@ -45,11 +46,35 @@ class SearchViewModel @JvmOverloads constructor(
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+
+    private data class CachedSearch(
+        val results: SearchResults,
+        val createdAtMs: Long
+    )
+
+    private val cacheTtlMs: Long = 30_000
+    private val maxCacheEntries: Int = 25
+    private val searchCache = object : LinkedHashMap<String, CachedSearch>(maxCacheEntries, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedSearch>): Boolean {
+            return size > maxCacheEntries
+        }
+    }
     
     fun updateSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
 
         if (query.length >= 2 && query.isNotBlank()) {
+            val cached = getCachedResults(query)
+            if (cached != null) {
+                searchJob?.cancel()
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = null,
+                    searchResults = cached
+                )
+                return
+            }
+
             performSearch(query)
         } else {
             searchJob?.cancel()
@@ -58,6 +83,19 @@ class SearchViewModel @JvmOverloads constructor(
                 isLoading = false
             )
         }
+    }
+
+    private fun getCachedResults(query: String): SearchResults? {
+        val cached = searchCache[query] ?: return null
+        if (System.currentTimeMillis() - cached.createdAtMs > cacheTtlMs) {
+            searchCache.remove(query)
+            return null
+        }
+        return cached.results
+    }
+
+    private fun putCachedResults(query: String, results: SearchResults) {
+        searchCache[query] = CachedSearch(results = results, createdAtMs = System.currentTimeMillis())
     }
     
     private fun performSearch(query: String) {
@@ -91,6 +129,16 @@ class SearchViewModel @JvmOverloads constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     searchResults = SearchResults(
+                        artists = mappedArtists,
+                        events = mappedEvents,
+                        venues = mappedVenues,
+                        cities = mappedCities
+                    )
+                )
+
+                putCachedResults(
+                    query = query,
+                    results = SearchResults(
                         artists = mappedArtists,
                         events = mappedEvents,
                         venues = mappedVenues,
