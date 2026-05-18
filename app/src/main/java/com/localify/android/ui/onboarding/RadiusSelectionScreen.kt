@@ -26,9 +26,15 @@ import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.Circle as GmsCircle
 import com.google.android.gms.maps.model.CircleOptions
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlin.math.cos
 
 @Composable
+@OptIn(FlowPreview::class)
 fun RadiusSelectionScreen(
     selectedCity: String,
     radius: Double,
@@ -86,13 +92,15 @@ fun RadiusSelectionScreen(
                 .background(Color(0xFFF5F5F5))
         ) {
             var mapLoaded by remember { mutableStateOf(false) }
-            
+            var debouncedRadiusMiles by remember { mutableStateOf(radiusValue) }
+
             if (hasGoogleMapsKey) {
                 val cameraPositionState = rememberCameraPositionState {
                     position = CameraPosition.fromLatLngZoom(mapCenterGms, 12f)
                 }
-                val radiusMeters = remember(radiusValue) { (radiusValue * 1609.34f).toDouble() }
+                val radiusMeters = remember(debouncedRadiusMiles) { (debouncedRadiusMiles * 1609.34f).toDouble() }
                 var radiusCircle by remember { mutableStateOf<GmsCircle?>(null) }
+                var mapCallbackSet by remember { mutableStateOf(false) }
                 val uiSettings = remember {
                     MapUiSettings(
                         compassEnabled = false,
@@ -126,7 +134,10 @@ fun RadiusSelectionScreen(
                 ) {
                     // Map loaded callback
                     MapEffect(radiusMeters) { googleMap ->
-                        googleMap.setOnMapLoadedCallback { mapLoaded = true }
+                        if (!mapCallbackSet) {
+                            googleMap.setOnMapLoadedCallback { mapLoaded = true }
+                            mapCallbackSet = true
+                        }
 
                         if (radiusCircle == null) {
                             radiusCircle = googleMap.addCircle(
@@ -226,6 +237,17 @@ fun RadiusSelectionScreen(
                     mapLoaded = true
                 }
             }
+
+            LaunchedEffect(Unit) {
+                snapshotFlow { radiusValue }
+                    .debounce(200)
+                    .distinctUntilChanged()
+                    .filter { it.isFinite() }
+                    .collectLatest { v ->
+                        debouncedRadiusMiles = v
+                        onRadiusChanged(v.toDouble())
+                    }
+            }
             
             // Loading indicator
             if (!mapLoaded) {
@@ -272,7 +294,6 @@ fun RadiusSelectionScreen(
                 value = radiusValue,
                 onValueChange = { 
                     radiusValue = it
-                    onRadiusChanged(it.toDouble()) 
                 },
                 valueRange = 1f..50f,
                 steps = 49,

@@ -23,6 +23,8 @@ fun CitySearchScreen(
     searchText: String,
     onSearchTextChanged: (String) -> Unit,
     filteredCities: List<CityResponse>,
+    isLoading: Boolean,
+    error: String?,
     selectedCityId: String,
     onCitySelected: (cityId: String, cityLabel: String) -> Unit
 ) {
@@ -72,32 +74,73 @@ fun CitySearchScreen(
         )
         
         Spacer(modifier = Modifier.height(16.dp))
-        
-        // City results
-        if (filteredCities.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(filteredCities) { city ->
-                    val label = buildString {
-                        append(city.name)
-                        if (!city.state.isNullOrBlank()) {
-                            append(", ")
-                            append(city.state)
-                        }
-                    }
-                    CityItem(
-                        city = label,
-                        isSelected = selectedCityId == city.id,
-                        onClick = {
-                            onCitySelected(city.id, label)
-                        }
+
+        when {
+            searchText.length < 2 -> {
+                Text(
+                    text = "Type at least 2 characters to search cities.",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            isLoading -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color(0xFFE91E63),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Searching…",
+                        color = Color.Gray,
+                        fontSize = 14.sp
                     )
                 }
+                Spacer(modifier = Modifier.weight(1f))
             }
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
+            error != null -> {
+                Text(
+                    text = error,
+                    color = Color.Red,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            filteredCities.isEmpty() -> {
+                Text(
+                    text = "No cities found.",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredCities) { city ->
+                        val label = buildString {
+                            append(city.name)
+                            if (!city.state.isNullOrBlank()) {
+                                append(", ")
+                                append(city.state)
+                            }
+                        }
+                        CityItem(
+                            city = label,
+                            isSelected = selectedCityId == city.id,
+                            onClick = {
+                                onCitySelected(city.id, label)
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }

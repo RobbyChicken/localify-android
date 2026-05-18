@@ -34,6 +34,8 @@ class CitySearchScreenTest {
                     searchText = "ith",
                     onSearchTextChanged = { },
                     filteredCities = cities,
+                    isLoading = false,
+                    error = null,
                     selectedCityId = "",
                     onCitySelected = { _, _ -> }
                 )
@@ -62,6 +64,8 @@ class CitySearchScreenTest {
                     searchText = "ith",
                     onSearchTextChanged = { },
                     filteredCities = cities,
+                    isLoading = false,
+                    error = null,
                     selectedCityId = "",
                     onCitySelected = { _, _ -> }
                 )
@@ -93,6 +97,8 @@ class CitySearchScreenTest {
                     searchText = "ith",
                     onSearchTextChanged = { },
                     filteredCities = cities,
+                    isLoading = false,
+                    error = null,
                     selectedCityId = "",
                     onCitySelected = { id, label ->
                         selectedId = id

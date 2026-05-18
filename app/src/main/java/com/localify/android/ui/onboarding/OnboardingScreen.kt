@@ -309,6 +309,8 @@ private fun CitySearchContent(
             onSearchTextChanged(it)
         },
         filteredCities = onboardingUiState.cityResults,
+        isLoading = onboardingUiState.isLoadingCities,
+        error = onboardingUiState.error,
         selectedCityId = selectedCityId,
         onCitySelected = onCitySelected
     )
